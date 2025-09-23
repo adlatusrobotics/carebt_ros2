@@ -5,7 +5,7 @@
 
 ## About
 
-Packages to use careBT together with ROS2.
+Packages to use careBT together with ROS2 Kilted.
 
 ## Documentation
 
