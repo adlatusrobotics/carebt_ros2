@@ -236,8 +236,15 @@ class ComputePathToPoseAction(RosActionClientActionNode):
         self._goal_msg.planner_id = ''  # TODO: select planner from kb
 
     def result_callback(self, future) -> None:
-        self._path = future.result().result.path
-        self.set_status(NodeStatus.SUCCESS)
+        path = future.result().result.path
+        if(len(path.poses) == 0):
+            self.get_logger().info('No path found')
+            self.set_contingency_message('EMPTY_PATH')
+            self.set_status(NodeStatus.FAILURE)
+        else:
+            self.get_logger().info(f'Path found with size: {len(path.poses)}')
+            self._path = path
+            self.set_status(NodeStatus.SUCCESS)
 
 
 ########################################################################
