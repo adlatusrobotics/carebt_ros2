@@ -18,7 +18,7 @@ from carebt_ros2.rosSubscriberActionNode import RosSubscriberActionNode
 from lifecycle_msgs.srv import ChangeState, GetState
 from rcl_interfaces.msg import Parameter
 from rcl_interfaces.srv import SetParameters
-from ros2param.api import get_parameter_value
+from ros2param.api import get_value
 from std_msgs.msg import Empty
 from threading import Timer, Thread
 from time import sleep
@@ -211,7 +211,7 @@ class SetParameterClient(ActionNode):
         if(self.__client.wait_for_service(timeout_sec=1.0)):
             param = Parameter()
             param.name = self._param_name
-            param.value = get_parameter_value(string_value=self._param_value)
+            param.value = get_value(string_value=self._param_value)
 
             req = SetParameters.Request()
             req.parameters = [param]
