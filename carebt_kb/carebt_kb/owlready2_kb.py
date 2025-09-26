@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 from owlready2 import *
 
 
@@ -185,11 +187,11 @@ class OwlReady2Kb():
                     # if the str is a ROS str
                     if key.endswith('_rosstr'):
                         if is_functional:
-                            typed_dict[key] = f'"{frame[key]}"'
+                            typed_dict[key] = str(json.loads(json.dumps(frame[key])))
                         else:
                             str_value_list = []
                             for value in frame[key]:
-                                str_value_list.append(value)
+                                str_value_list.append(str(json.loads(json.dumps(value))))
                             typed_dict[key] = str_value_list
                     # else it is a 'normal' str
                     else:
