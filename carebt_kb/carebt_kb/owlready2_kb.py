@@ -189,7 +189,7 @@ class OwlReady2Kb():
                     # if the str is a ROS str
                     if key.endswith('_rosstr'):
                         if is_functional:
-                            typed_dict[key] = str(json.loads(json.dumps(frame[key])))
+                            typed_dict[key] = f'"{json.loads(json.dumps(frame[key]))}"'
                         else:
                             str_value_list = []
                             for value in frame[key]:
