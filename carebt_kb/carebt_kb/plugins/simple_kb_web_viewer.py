@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import html
+import threading
+
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from carebt_kb.plugin_base import PluginBase
 from functools import partial
-import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import threading
 
 
 class SimpleWebServer(BaseHTTPRequestHandler):
@@ -24,6 +26,11 @@ class SimpleWebServer(BaseHTTPRequestHandler):
     def __init__(self, kb, *args, **kwargs):
         self.__kb = kb
         super().__init__(*args, **kwargs)
+
+    def iri_to_name(self, iri: str) -> str:
+        fragment = iri.split("#")[-1]
+        filename = iri.split("/")[-1].split(".")[0]
+        return f"{filename}.{fragment}"
 
     def do_GET(self):
         self.send_response(200)
@@ -45,12 +52,21 @@ class SimpleWebServer(BaseHTTPRequestHandler):
                 self.wfile.write(bytes(f"<h3>{str_clazz}</h3>", "utf-8"))
                 str_individuals = self.__kb.get_individuals_of(str_clazz)
                 individuals = self.__kb.read_items(str_individuals)
+                # iterate individuals
                 for individual in individuals:
                     self.wfile.write(bytes(f"<table border: 1px>", "utf-8"))
-                    for key in sorted(individual.keys()):
-                        if key.endswith('_rosstr') and isinstance(individual[key], list):
-                            self.wfile.write(bytes(f"<tr><td>{key} length</td><td>{len(individual[key])}</td></tr>", "utf-8"))
-                        self.wfile.write(bytes(f"<tr><td>{key}</td><td>{individual[key]}</td></tr>", "utf-8"))
+                    # add 'iri' and 'is_a' as the first two rows in the table
+                    self.wfile.write(bytes(f"<tr><td><b>iri</b></td><td>{individual['iri']}</td></tr>", "utf-8"))
+                    self.wfile.write(bytes(f"<tr><td><b>ref</b></td><td>{self.iri_to_name(individual['iri'])}</td></tr>", "utf-8"))
+                    self.wfile.write(bytes(f"<tr><td><b>is_a</b></td><td>{individual['is_a']}</td></tr>", "utf-8"))
+                    # iterate over the properties of str_clazz (of the individual)
+                    for p in self.__kb.get_properties_of_class(str_clazz):
+                        value = individual.get(p['name'], '')
+                        length_str = f"length: {len(value)}" if not p['functional'] and value is not None else ""
+                        type_str = f"{p['type']}[]" if not p['functional'] else p['type']
+                        col1 = f"<b>{p['name']}</b><br>type: {type_str}<br>{length_str}"
+                        self.wfile.write(bytes(f"<tr><td>{col1}</td><td>{value}</td></tr>", "utf-8"))
+                        
                     self.wfile.write(bytes(f"</table>", "utf-8"))
 
         # end HTML
