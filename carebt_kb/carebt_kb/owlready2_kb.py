@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 from owlready2 import *
+from typing import List, Dict, Any
+
 
 
 class OwlReady2Kb():
@@ -185,11 +189,11 @@ class OwlReady2Kb():
                     # if the str is a ROS str
                     if key.endswith('_rosstr'):
                         if is_functional:
-                            typed_dict[key] = f'"{frame[key]}"'
+                            typed_dict[key] = str(json.loads(json.dumps(frame[key])))
                         else:
                             str_value_list = []
                             for value in frame[key]:
-                                str_value_list.append(value)
+                                str_value_list.append(str(json.loads(json.dumps(value))))
                             typed_dict[key] = str_value_list
                     # else it is a 'normal' str
                     else:
@@ -263,50 +267,58 @@ class OwlReady2Kb():
             self.__sync_to_file()
             return str(item)
 
-    def read(self, filter):
+
+    def read(self, filter) -> List[Dict[str, Any]]:
         items = []
         for o in self.__get_items(filter):
             items.append(self.__onto_to_dict(o))
         return items
 
-    def read_items(self, items):
+
+    def read_items(self, items) -> List[Dict[str, Any]]:
         rtrn_items = []
         for item in items:
             o = eval(f'self.{item}')
             rtrn_items.append(self.__onto_to_dict(o))
         return rtrn_items
-    
-    def update(self, filter, update):
+
+
+    def update(self, filter, update) -> None:
         for item in self.__get_items(filter):
             update['type'] = eval(f'self.{item}.__class__')
             self.__update(item, update)
         self.__sync_to_file()
 
-    def update_items(self, items, update):
+
+    def update_items(self, items, update) -> None:
         for item in items:
             update['type'] = eval(f'self.{item}.__class__')
             self.__update(item, update)
         self.__sync_to_file()
 
-    def delete(self, filter):
+
+    def delete(self, filter) -> None:
         for item in self.__get_items(filter):
             destroy_entity(item)
         self.__sync_to_file()
 
-    def delete_items(self, items):
+
+    def delete_items(self, items) -> None:
         for item in items:
             o = eval(f'self.{item}')
             destroy_entity(o)
         self.__sync_to_file()
 
-    def get_classes(self):
+
+    def get_classes(self) -> List[str]:
         clazzes = list(eval(f'self.{self.__onto}.classes()'))
         str_list = []
         for clazz in clazzes:
             str_list.append(str(clazz))
         return str_list
 
-    def get_subclasses_of(self, class_str: str):
+
+    def get_subclasses_of(self, class_str: str) -> List[str]:
         if class_str == 'Thing':
             clazz = Thing
         else:
@@ -316,10 +328,13 @@ class OwlReady2Kb():
         for clazz in subclazzes:
             str_list.append(str(clazz))
         return str_list
-    def has_subclasses(self, class_str: str):
+
+
+    def has_subclasses(self, class_str: str) -> bool:
         return len(self.get_subclasses_of(class_str)) > 0
 
-    def get_individuals_of(self, class_str: str):
+
+    def get_individuals_of(self, class_str: str) -> List[str]:
         if class_str == 'Thing':
             clazz = Thing
         else:
@@ -330,11 +345,54 @@ class OwlReady2Kb():
             str_list.append(str(instance))
         return str_list
 
+
     def is_individual_of(self, individual_str: str, class_str: str) -> bool:
         if class_str == 'Thing':
             return eval(f'isinstance(self.{individual_str}, Thing)')
         else:
             return eval(f'isinstance(self.{individual_str}, self.{class_str})')
+
+
+    def get_properties_of_class(self, class_str: str) -> List[Dict[str, str | bool]]:
+        if class_str == "Thing":
+            cls = Thing
+        else:
+            cls = eval(f"self.{class_str}")
+        
+        ancestors = set(cls.ancestors())
+        props_list = []
+
+        for p in cls.namespace.properties():
+            try:
+                # include property if domain matches class or ancestor
+                if not p.domain or any(d in ancestors for d in p.domain):
+                    prop_info = {
+                        "name": p.name,
+                        "type": self.get_property_type(p),
+                        "functional": p.is_functional_for(cls)
+                    }
+                    props_list.append(prop_info)
+            except Exception as ex:
+                print(f"Skipping property {p.name}: {ex}")
+
+        props_list.sort(key=lambda x: x["name"])
+        return props_list
+
+
+    def get_property_type(self, prop: PropertyClass) -> str:
+        rtrn = "unknown"
+        if not prop.range:
+            return rtrn
+        
+        r = prop.range[0]
+        # Python primitive types
+        if isinstance(r, type):
+            rtrn = r.__name__
+        # OWL classes (ThingClass)
+        elif hasattr(r, "name"):
+            rtrn = r.name
+        return rtrn
+
 
     def trigger_reasoner(self, reasoner: str, debug: int = 0):
         if eval(f'self.{self.__onto_inferrences}.loaded'):
@@ -347,6 +405,7 @@ class OwlReady2Kb():
                 sync_reasoner_pellet(infer_property_values = True, infer_data_property_values = True, debug = debug)
             else:
                 print('UNKNOWN REASONER')
+
 
     def save(self):
         eval(f'self.{self.__onto}.save({self.__filename}, format = "rdfxml")')

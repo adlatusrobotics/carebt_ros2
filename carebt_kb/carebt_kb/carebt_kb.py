@@ -12,18 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
+import json
+import rclpy
+
 from carebt_msgs.srv import KbQuery
 from carebt_msgs.action import KbEvalState
 from carebt_kb.owlready2_kb import OwlReady2Kb
 from carebt_kb.plugin_base import import_class
-import json
-import rclpy
+
 from rclpy.action import ActionServer, CancelResponse
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.action.server import ServerGoalHandle
-import threading
+
+from typing import List, Dict, Any
+
 
 
 # parameter constants
@@ -219,6 +224,9 @@ class KbServer(Node):
 
     def is_individual_of(self, individual_str: str, class_str: str) -> bool:
         return self.__kb(individual_str, class_str)
+
+    def get_properties_of_class(self, class_str: str) -> List[Dict[str, str | bool]]:
+        return self.__kb.get_properties_of_class(class_str)
 
 
 def main(args=None):
