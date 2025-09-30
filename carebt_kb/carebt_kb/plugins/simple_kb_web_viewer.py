@@ -80,7 +80,7 @@ class SimpleKbWebViewer(PluginBase):
 
     def on_init_callback(self, plugin_name: str):
 
-        self._kb_server.declare_parameter(f'{plugin_name}.host', 'localhost')
+        self._kb_server.declare_parameter(f'{plugin_name}.host', '0.0.0.0')
         self._kb_server.declare_parameter(f'{plugin_name}.port', 8080)
 
         host = self._kb_server.get_parameter(
