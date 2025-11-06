@@ -34,7 +34,7 @@ class RosActionClientActionNode(ActionNode):
                  params: str = None):
         super().__init__(bt_runner, params)
         self.set_status(NodeStatus.IDLE)
-        self._goal_handle: ClientGoalHandle
+        self._goal_handle: ClientGoalHandle = None
         self._goal_msg = action_type.Goal()
         self._action_client = ActionClient(bt_runner.node, action_type, action_name)
         self.get_logger().debug('{} - action_client.wait_for_server...'
@@ -57,11 +57,12 @@ class RosActionClientActionNode(ActionNode):
     # PROTECTED
 
     def _internal_on_abort(self) -> None:
-        self._goal_handle.cancel_goal()
+        if self._goal_handle is not None:
+            self._goal_handle.cancel_goal()
         super()._internal_on_abort()
 
     def _internal_on_delete(self) -> None:
-        if self._get_result_future is not None:
+        if hasattr(self, '_get_result_future') and self._get_result_future is not None:
             self._get_result_future._callbacks = []
         self._action_client._feedback_callbacks = {}
         super()._internal_on_delete()
