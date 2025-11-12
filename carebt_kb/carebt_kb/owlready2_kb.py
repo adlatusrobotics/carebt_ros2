@@ -50,10 +50,16 @@ class OwlReady2Kb():
             except Exception as ex:
                 pass
         return items
+    
+    def __iri_to_ref(self, iri: str) -> str:
+        fragment = iri.split("#")[-1]
+        filename = iri.split("/")[-1].split(".")[0]
+        return f"{filename}.{fragment}"
 
     def __onto_to_dict(self, clazz: ThingClass):
         dict_str: str = '{'
         dict_str += f'\'iri\': \'{clazz.iri}\', '
+        dict_str += f'\'ref\': \'{self.__iri_to_ref(clazz.iri)}\', '
         dict_str += f'\'is_a\': ['
         for c in clazz.is_a:
             dict_str += f'\'{str(c)}\', '

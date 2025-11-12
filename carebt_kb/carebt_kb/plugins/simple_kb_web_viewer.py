@@ -27,11 +27,6 @@ class SimpleWebServer(BaseHTTPRequestHandler):
         self.__kb = kb
         super().__init__(*args, **kwargs)
 
-    def iri_to_name(self, iri: str) -> str:
-        fragment = iri.split("#")[-1]
-        filename = iri.split("/")[-1].split(".")[0]
-        return f"{filename}.{fragment}"
-
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -57,7 +52,7 @@ class SimpleWebServer(BaseHTTPRequestHandler):
                     self.wfile.write(bytes(f"<table border: 1px>", "utf-8"))
                     # add 'iri' and 'is_a' as the first two rows in the table
                     self.wfile.write(bytes(f"<tr><td><b>iri</b></td><td>{individual['iri']}</td></tr>", "utf-8"))
-                    self.wfile.write(bytes(f"<tr><td><b>ref</b></td><td>{self.iri_to_name(individual['iri'])}</td></tr>", "utf-8"))
+                    self.wfile.write(bytes(f"<tr><td><b>ref</b></td><td>{individual['ref']}</td></tr>", "utf-8"))
                     self.wfile.write(bytes(f"<tr><td><b>is_a</b></td><td>{individual['is_a']}</td></tr>", "utf-8"))
                     # iterate over the properties of str_clazz (of the individual)
                     for p in self.__kb.get_properties_of_class(str_clazz):
