@@ -32,6 +32,7 @@ class SimpleWebServer(BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
         str_clazzes = self.__kb.get_classes()
+        elem_id = 0  # Move counter before HTML generation
         # start HTML
         self.wfile.write(bytes("<html>\
             <head>\
@@ -39,7 +40,23 @@ class SimpleWebServer(BaseHTTPRequestHandler):
             <style>\
                 table, th, td { border: 1px solid black; }\
                 table {padding: 10px;}\
+                .expandable { cursor: pointer; color: blue; text-decoration: underline; }\
+                .collapsed { display: inline; }\
+                .expanded { display: none; }\
             </style>\
+            <script>\
+                function toggleText(id) {\
+                    var collapsed = document.getElementById('c_' + id);\
+                    var expanded = document.getElementById('e_' + id);\
+                    if (collapsed.style.display === 'none') {\
+                        collapsed.style.display = 'inline';\
+                        expanded.style.display = 'none';\
+                    } else {\
+                        collapsed.style.display = 'none';\
+                        expanded.style.display = 'inline';\
+                    }\
+                }\
+            </script>\
             </head><body>", "utf-8"))
         # iterate classes
         for str_clazz in sorted(str_clazzes):
@@ -60,9 +77,20 @@ class SimpleWebServer(BaseHTTPRequestHandler):
                         length_str = f"length: {len(value)}" if not p['functional'] and value is not None else ""
                         type_str = f"{p['type']}[]" if not p['functional'] else p['type']
                         col1 = f"<b>{p['name']}</b><br>type: {type_str}<br>{length_str}"
-                        self.wfile.write(bytes(f"<tr><td>{col1}</td><td>{value}</td></tr>", "utf-8"))
                         
-                    self.wfile.write(bytes(f"</table>", "utf-8"))
+                        # Format value with expand/collapse if long
+                        value_str = str(value)
+                        if len(value_str) > 100:  # threshold for "long" content
+                            preview = html.escape(value_str[:100])
+                            full = html.escape(value_str)
+                            value_html = f"<span id='c_{elem_id}' class='collapsed'>{preview}... <span class='expandable' onclick='toggleText({elem_id})'>[more]</span></span><span id='e_{elem_id}' class='expanded'>{full} <span class='expandable' onclick='toggleText({elem_id})'>[less]</span></span>"
+                            elem_id += 1
+                        else:
+                            value_html = html.escape(value_str)
+                        
+                        self.wfile.write(bytes(f"<tr><td>{col1}</td><td>{value_html}</td></tr>", "utf-8"))
+                    self.wfile.write(bytes("</table>", "utf-8"))  # Add missing closing table tag
+
 
         # end HTML
         self.wfile.write(bytes("</body></html>", "utf-8"))
