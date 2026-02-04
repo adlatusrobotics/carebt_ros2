@@ -414,4 +414,4 @@ class OwlReady2Kb():
 
 
     def save(self):
-        eval(f'self.{self.__onto}.save({self.__filename}, format = "rdfxml")')
+        eval(f'self.{self.__onto}.save("{self.__filename}", format = "rdfxml")')
