@@ -16,6 +16,7 @@ import json
 
 from owlready2 import *
 from typing import List, Dict, Any
+import threading
 
 
 
@@ -24,6 +25,7 @@ class OwlReady2Kb():
     OWL_KEYWORDS = ['iri', 'is_a', 'name', 'namespace', 'storid']
 
     def __init__(self, filename: str, sync_to_file: bool = False):
+        self.__lock = threading.RLock()
         self.__filename = filename
         self.__sync_on = sync_to_file
         self.__onto = filename.split('/')[-1].split('.')[0]
@@ -261,158 +263,174 @@ class OwlReady2Kb():
     # PUBLIC
 
     def create(self, frame) -> str:
-        if 'type' not in frame:
-            print(f'To create a new item a type is required.')
-            return None
-        else:
-            onto_str = f'self.{frame["type"]}()'
-            # create item
-            item = eval(onto_str)
-            # update item
-            self.__update(item, frame)
-            self.__sync_to_file()
-            return str(item)
+        with self.__lock:
+            if 'type' not in frame:
+                print(f'To create a new item a type is required.')
+                return None
+            else:
+                onto_str = f'self.{frame["type"]}()'
+                # create item
+                item = eval(onto_str)
+                # update item
+                self.__update(item, frame)
+                self.__sync_to_file()
+                return str(item)
 
 
     def read(self, filter) -> List[Dict[str, Any]]:
-        items = []
-        for o in self.__get_items(filter):
-            items.append(self.__onto_to_dict(o))
-        return items
+        with self.__lock:
+            items = []
+            for o in self.__get_items(filter):
+                items.append(self.__onto_to_dict(o))
+            return items
 
 
     def read_items(self, items) -> List[Dict[str, Any]]:
-        rtrn_items = []
-        for item in items:
-            o = eval(f'self.{item}')
-            if o is not None:
-                rtrn_items.append(self.__onto_to_dict(o))
-        return rtrn_items
+        with self.__lock:
+            rtrn_items = []
+            for item in items:
+                o = eval(f'self.{item}')
+                if o is not None:
+                    rtrn_items.append(self.__onto_to_dict(o))
+            return rtrn_items
 
 
     def update(self, filter, update) -> None:
-        for item in self.__get_items(filter):
-            update['type'] = eval(f'self.{item}.__class__')
-            self.__update(item, update)
-        self.__sync_to_file()
+        with self.__lock:
+            for item in self.__get_items(filter):
+                update['type'] = eval(f'self.{item}.__class__')
+                self.__update(item, update)
+            self.__sync_to_file()
 
 
     def update_items(self, items, update) -> None:
-        for item in items:
-            update['type'] = eval(f'self.{item}.__class__')
-            self.__update(item, update)
-        self.__sync_to_file()
+        with self.__lock:
+            for item in items:
+                update['type'] = eval(f'self.{item}.__class__')
+                self.__update(item, update)
+            self.__sync_to_file()
 
 
     def delete(self, filter) -> None:
-        for item in self.__get_items(filter):
-            destroy_entity(item)
-        self.__sync_to_file()
+        with self.__lock:
+            for item in self.__get_items(filter):
+                destroy_entity(item)
+            self.__sync_to_file()
 
 
     def delete_items(self, items) -> None:
-        for item in items:
-            o = eval(f'self.{item}')
-            destroy_entity(o)
-        self.__sync_to_file()
+        with self.__lock:
+            for item in items:
+                o = eval(f'self.{item}')
+                destroy_entity(o)
+            self.__sync_to_file()
 
 
     def get_classes(self) -> List[str]:
-        clazzes = list(eval(f'self.{self.__onto}.classes()'))
-        str_list = []
-        for clazz in clazzes:
-            str_list.append(str(clazz))
-        return str_list
+        with self.__lock:
+            clazzes = list(eval(f'self.{self.__onto}.classes()'))
+            str_list = []
+            for clazz in clazzes:
+                str_list.append(str(clazz))
+            return str_list
 
 
     def get_subclasses_of(self, class_str: str) -> List[str]:
-        if class_str == 'Thing':
-            clazz = Thing
-        else:
-            clazz = eval(f'self.{class_str}')
-        subclazzes = list(clazz.subclasses())
-        str_list = []
-        for clazz in subclazzes:
-            str_list.append(str(clazz))
-        return str_list
+        with self.__lock:
+            if class_str == 'Thing':
+                clazz = Thing
+            else:
+                clazz = eval(f'self.{class_str}')
+            subclazzes = list(clazz.subclasses())
+            str_list = []
+            for clazz in subclazzes:
+                str_list.append(str(clazz))
+            return str_list
 
 
     def has_subclasses(self, class_str: str) -> bool:
-        return len(self.get_subclasses_of(class_str)) > 0
+        with self.__lock:
+            return len(self.get_subclasses_of(class_str)) > 0
 
 
     def get_individuals_of(self, class_str: str) -> List[str]:
-        if class_str == 'Thing':
-            clazz = Thing
-        else:
-            clazz = eval(f'self.{class_str}')
-        instances = list(clazz.instances())
-        str_list = []
-        for instance in instances:
-            str_list.append(str(instance))
-        return str_list
+        with self.__lock:
+            if class_str == 'Thing':
+                clazz = Thing
+            else:
+                clazz = eval(f'self.{class_str}')
+            instances = list(clazz.instances())
+            str_list = []
+            for instance in instances:
+                str_list.append(str(instance))
+            return str_list
 
 
     def is_individual_of(self, individual_str: str, class_str: str) -> bool:
-        if class_str == 'Thing':
-            return eval(f'isinstance(self.{individual_str}, Thing)')
-        else:
-            return eval(f'isinstance(self.{individual_str}, self.{class_str})')
+        with self.__lock:
+            if class_str == 'Thing':
+                return eval(f'isinstance(self.{individual_str}, Thing)')
+            else:
+                return eval(f'isinstance(self.{individual_str}, self.{class_str})')
 
 
     def get_properties_of_class(self, class_str: str) -> List[Dict[str, str | bool]]:
-        if class_str == "Thing":
-            cls = Thing
-        else:
-            cls = eval(f"self.{class_str}")
-        
-        ancestors = set(cls.ancestors())
-        props_list = []
+        with self.__lock:
+            if class_str == "Thing":
+                cls = Thing
+            else:
+                cls = eval(f"self.{class_str}")
+            
+            ancestors = set(cls.ancestors())
+            props_list = []
 
-        for p in cls.namespace.properties():
-            try:
-                # include property if domain matches class or ancestor
-                if not p.domain or any(d in ancestors for d in p.domain):
-                    prop_info = {
-                        "name": p.name,
-                        "type": self.get_property_type(p),
-                        "functional": p.is_functional_for(cls)
-                    }
-                    props_list.append(prop_info)
-            except Exception as ex:
-                print(f"Skipping property {p.name}: {ex}")
+            for p in cls.namespace.properties():
+                try:
+                    # include property if domain matches class or ancestor
+                    if not p.domain or any(d in ancestors for d in p.domain):
+                        prop_info = {
+                            "name": p.name,
+                            "type": self.get_property_type(p),
+                            "functional": p.is_functional_for(cls)
+                        }
+                        props_list.append(prop_info)
+                except Exception as ex:
+                    print(f"Skipping property {p.name}: {ex}")
 
-        props_list.sort(key=lambda x: x["name"])
-        return props_list
+            props_list.sort(key=lambda x: x["name"])
+            return props_list
 
 
     def get_property_type(self, prop: PropertyClass) -> str:
-        rtrn = "unknown"
-        if not prop.range:
+        with self.__lock:
+            rtrn = "unknown"
+            if not prop.range:
+                return rtrn
+            
+            r = prop.range[0]
+            # Python primitive types
+            if isinstance(r, type):
+                rtrn = r.__name__
+            # OWL classes (ThingClass)
+            elif hasattr(r, "name"):
+                rtrn = r.name
             return rtrn
-        
-        r = prop.range[0]
-        # Python primitive types
-        if isinstance(r, type):
-            rtrn = r.__name__
-        # OWL classes (ThingClass)
-        elif hasattr(r, "name"):
-            rtrn = r.name
-        return rtrn
 
 
     def trigger_reasoner(self, reasoner: str, debug: int = 0):
-        if eval(f'self.{self.__onto_inferrences}.loaded'):
-                eval(f'self.{self.__onto_inferrences}.destroy()')
-                exec(f'self.{self.__onto_inferrences} = get_ontology(\'{self.__base_inferrences_iri}\')')
-        with eval(f'self.{self.__onto_inferrences}'):
-            if reasoner == 'hermit':
-                sync_reasoner_hermit(debug = debug)
-            elif reasoner == 'pellet':
-                sync_reasoner_pellet(infer_property_values = True, infer_data_property_values = True, debug = debug)
-            else:
-                print('UNKNOWN REASONER')
+        with self.__lock:
+            if eval(f'self.{self.__onto_inferrences}.loaded'):
+                    eval(f'self.{self.__onto_inferrences}.destroy()')
+                    exec(f'self.{self.__onto_inferrences} = get_ontology(\'{self.__base_inferrences_iri}\')')
+            with eval(f'self.{self.__onto_inferrences}'):
+                if reasoner == 'hermit':
+                    sync_reasoner_hermit(debug = debug)
+                elif reasoner == 'pellet':
+                    sync_reasoner_pellet(infer_property_values = True, infer_data_property_values = True, debug = debug)
+                else:
+                    print('UNKNOWN REASONER')
 
 
     def save(self):
-        eval(f'self.{self.__onto}.save("{self.__filename}", format = "rdfxml")')
+        with self.__lock:
+            eval(f'self.{self.__onto}.save("{self.__filename}", format = "rdfxml")')
