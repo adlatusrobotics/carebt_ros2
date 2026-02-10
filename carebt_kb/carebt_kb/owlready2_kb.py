@@ -285,7 +285,8 @@ class OwlReady2Kb():
         rtrn_items = []
         for item in items:
             o = eval(f'self.{item}')
-            rtrn_items.append(self.__onto_to_dict(o))
+            if o is not None:
+                rtrn_items.append(self.__onto_to_dict(o))
         return rtrn_items
 
 
