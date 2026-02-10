@@ -16,12 +16,11 @@ from carebt.actionNode import ActionNode
 from carebt.nodeStatus import NodeStatus
 from carebt_ros2.rosSubscriberActionNode import RosSubscriberActionNode
 from lifecycle_msgs.srv import ChangeState, GetState
-from rcl_interfaces.msg import Parameter
 from rcl_interfaces.srv import SetParameters
-from ros2param.api import get_value
 from std_msgs.msg import Empty
 from threading import Timer, Thread
 from time import sleep
+from rclpy.parameter import Parameter 
 
 ########################################################################
 
@@ -209,15 +208,63 @@ class SetParameterClient(ActionNode):
         self.__client = self.__bt_runner.node.create_client(SetParameters,
                                                             f'/{self._node}/set_parameters')
         if(self.__client.wait_for_service(timeout_sec=1.0)):
-            param = Parameter()
-            param.name = self._param_name
-            param.value = get_value(string_value=self._param_value)
+            param = Parameter(name=self._param_name, value=self._param_value)
 
             req = SetParameters.Request()
-            req.parameters = [param]
+            req.parameters = [param.to_parameter_msg()]
+            resp = self.__client.call(req)
+
+            if resp.results[0].successful:
+                self.set_status(NodeStatus.SUCCESS)
+            else:
+                self.set_status(NodeStatus.FAILURE)
+                self.set_contingency_message('PARAM_NOT_SET')
+        else:
+            self.set_status(NodeStatus.FAILURE)
+            self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+
+########################################################################
+
+class SetParameterListClient(ActionNode):
+    """Set the parameter (name/value) of the node.
+
+    Input Parameters
+    ----------------
+    ?node : str
+        The nodes name
+    ?param_name : str
+        The parameters name
+    ?param_value
+        The parameters value
+
+    """
+
+    def __init__(self, bt_runner):
+        super().__init__(bt_runner, '?node ?param_list')
+        self.__bt_runner = bt_runner
+
+    def on_init(self) -> None:
+        self.get_logger().info('{} - {} setting params {}'
+                               .format(self.__class__.__name__,
+                                       self._node,
+                                       [(param.name,param.value) for param in self._param_list]))
+        self.set_status(NodeStatus.SUSPENDED)
+        Thread(target=self.__worker, daemon=True).start()
+        
+    def __worker(self):
+        self.__client = self.__bt_runner.node.create_client(SetParameters,
+                                                            f'/{self._node}/set_parameters')
+        if(self.__client.wait_for_service(timeout_sec=1.0)):
+            parameter_msgs = []
+            for param in self._param_list:
+                if isinstance(param, Parameter): parameter_msgs.append(param.to_parameter_msg())
+                else: self.get_logger().warn(f"Parameter {param} is not of type rclpy.Parameter and will be ignored.")
+
+            req = SetParameters.Request()
+            req.parameters = parameter_msgs
 
             resp = self.__client.call(req)
-            if resp.results[0].successful:
+            if all(resp.results[i].successful for i in range(len(resp.results))):
                 self.set_status(NodeStatus.SUCCESS)
             else:
                 self.set_status(NodeStatus.FAILURE)
