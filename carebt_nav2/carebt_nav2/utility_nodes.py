@@ -113,6 +113,23 @@ class WaitForUserInput(RosSubscriberActionNode):
 
 class LifecycleClient(ActionNode):
     """Changes the state of a Lifecycle Node.
+    Transition ids:
+    0: create
+    1: configure
+    2: cleanup
+    3: activate
+    4: deactivate
+    5: unconfigured_shutdown
+    6: inactive_shutdown
+    7: active_shutdown
+    8: destroy
+    
+    State ids:
+    0: unknown
+    1: unconfigured
+    2: inactive
+    3: active
+    4: finalized
 
     Input Parameters
     ----------------
@@ -133,7 +150,8 @@ class LifecycleClient(ActionNode):
                                .format(self.__class__.__name__, self._node, self._id))
         self.set_status(NodeStatus.SUSPENDED)
         self.__thread_running = True
-        self.__expected_goal_state = [0, 2, 1, 3, 2, 4, 4, 4][self._id]
+        # self.__expected_goal_state = [0, 2, 1, 3, 2, 4, 4, 4][self._id]
+        self.__expected_goal_state = [1, 2, 1, 3, 2, 4, 4, 4, None][self._id]
         Thread(target=self.__worker, daemon=True).start()
         
     def __worker(self):
@@ -212,6 +230,7 @@ class SetParameterClient(ActionNode):
 
             req = SetParameters.Request()
             req.parameters = [param.to_parameter_msg()]
+            self.get_logger().info(f'Calling set_parameters service with {req.parameters}...')
             resp = self.__client.call(req)
 
             if resp.results[0].successful:
