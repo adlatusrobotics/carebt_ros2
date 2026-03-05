@@ -60,12 +60,14 @@ class SimpleWebServer(BaseHTTPRequestHandler):
             </head><body>", "utf-8"))
         # iterate classes
         for str_clazz in sorted(str_clazzes):
-            if not self.__kb.has_subclasses(str_clazz):
+            # check if there is an individual where class matches individual[is_a]
+            clazz_individuals = [individual for individual in self.__kb.read_items(self.__kb.get_individuals_of(str_clazz)) if str_clazz in individual.get('is_a', [])]
+            if not self.__kb.has_subclasses(str_clazz) or clazz_individuals:
                 self.wfile.write(bytes(f"<h3>{str_clazz}</h3>", "utf-8"))
-                str_individuals = self.__kb.get_individuals_of(str_clazz)
-                individuals = self.__kb.read_items(str_individuals)
+                # str_individuals = self.__kb.get_individuals_of(str_clazz)
+                # individuals = self.__kb.read_items(str_individuals)
                 # iterate individuals
-                for individual in individuals:
+                for individual in clazz_individuals:
                     self.wfile.write(bytes(f"<table border: 1px>", "utf-8"))
                     # add 'iri' and 'is_a' as the first two rows in the table
                     self.wfile.write(bytes(f"<tr><td><b>iri</b></td><td>{individual['iri']}</td></tr>", "utf-8"))

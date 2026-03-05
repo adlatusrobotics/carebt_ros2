@@ -326,6 +326,8 @@ class ServiceClient(ActionNode):
             req = self._request
             self._response = self.__client.call(req)
             self.set_status(NodeStatus.SUCCESS)
+            self.get_logger().info(f'service call successful, response: {self._response}')
         else:
             self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+            self.get_logger().warn('service not available')
