@@ -31,8 +31,12 @@ class OwlReady2Kb():
         self.__onto = filename.split('/')[-1].split('.')[0]
         self.__onto_inferrences = self.__onto + '_inferrences'
 
+        # create isolated world
+        self.world = World()
+
         # load ontology from file
-        exec(f'self.{self.__onto} = get_ontology(filename).load()')
+        onto = self.world.get_ontology(filename).load()
+        setattr(self, self.__onto, onto)
 
         # create ontology for inferrences (by reasoner pellet)
         base_iri = eval(f'self.{self.__onto}.base_iri')

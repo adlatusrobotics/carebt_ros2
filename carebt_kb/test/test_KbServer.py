@@ -57,7 +57,7 @@ class TestKbServer():
         res = kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         result = dict_from_kb_response(res)
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Grace'
 
@@ -70,7 +70,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 21
@@ -96,7 +96,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 21
@@ -128,7 +128,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 55
@@ -145,7 +145,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 55
@@ -170,7 +170,7 @@ class TestKbServer():
         p: PoseStamped = message_converter.convert_dictionary_to_ros_message('geometry_msgs/msg/PoseStamped', result[0]['pose_rosstr'])
         
         assert len(result) == 1
-        assert len(result[0]) == 5
+        assert len(result[0]) == 6
         assert result[0]['robot_id'] == 1
         assert result[0]['is_a'] == ['demo1.Robot']
         assert result[0]['status'] == 'Happy'

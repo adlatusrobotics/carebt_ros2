@@ -15,7 +15,7 @@
 import datetime
 import math
 from carebt_kb.owlready2_kb import OwlReady2Kb
-
+from owlready2 import locstr
 
 class TestOwlReady2Kb_TestOwl():
 
@@ -55,7 +55,11 @@ class TestOwlReady2Kb_TestOwl():
                         'test_time': datetime.time(21, 55, 59, 123456),
                         'test_normstr': 'This is a normstring.',
                         # locstr
-                        'test_locstr': [('German', 'de'), ('English', 'en'), ('Spanish', 'es')],
+                        'test_locstr': [
+                            locstr('German', 'de'),
+                            locstr('English', 'en'),
+                            locstr('Spanish', 'es')
+                        ],
                         # non-functional
                         'test_int_list': [1,2,3],
                         'test_bool_list': [True, False, True],
@@ -89,9 +93,13 @@ class TestOwlReady2Kb_TestOwl():
         assert r1[0]['test_normstr'] == 'This is a normstring.'
         # locstr
         assert isinstance(r1[0]['test_locstr'], list)
-        assert isinstance(r1[0]['test_locstr'][0], tuple)
-        assert isinstance(r1[0]['test_locstr'][0][0], str)
-        assert isinstance(r1[0]['test_locstr'][0][1], str)
+        assert isinstance(r1[0]['test_locstr'][0], locstr)
+        assert str(r1[0]['test_locstr'][0]) == 'German'
+        assert str(r1[0]['test_locstr'][1]) == 'English'
+        assert str(r1[0]['test_locstr'][2]) == 'Spanish'
+        assert r1[0]['test_locstr'][0].lang == 'de'
+        assert r1[0]['test_locstr'][1].lang == 'en'
+        assert r1[0]['test_locstr'][2].lang == 'es'
         # non-functional
         assert len(r1[0]['test_int_list']) == 3
         assert r1[0]['test_int_list'][0] == 1
@@ -170,7 +178,10 @@ class TestOwlReady2Kb_TestOwl():
                    'test_time': datetime.time(23, 59, 59, 112233),
                    'test_normstr': 'This is a normstring.',
                    # locstr
-                   'test_locstr': [('Hallo', 'de'), ('Hello', 'en'), ('Hola', 'es')],
+                   'test_locstr': [
+                       locstr('Hallo', 'de'),
+                       locstr('Hello', 'en'),
+                       locstr('Hola', 'es')],
                    # non-functional
                    'test_int_list': [9,8,7],
                    'test_bool_list': [False, True, False],
@@ -204,15 +215,13 @@ class TestOwlReady2Kb_TestOwl():
         assert r1[0]['test_time'] == datetime.time(23, 59, 59, 112233)
         # locstr
         assert isinstance(r1[0]['test_locstr'], list)
-        assert isinstance(r1[0]['test_locstr'][0], tuple)
-        assert isinstance(r1[0]['test_locstr'][0][0], str)
-        assert isinstance(r1[0]['test_locstr'][0][1], str)
-        assert r1[0]['test_locstr'][0][0] == 'Hallo'
-        assert r1[0]['test_locstr'][0][1] == 'de'
-        assert r1[0]['test_locstr'][1][0] == 'Hello'
-        assert r1[0]['test_locstr'][1][1] == 'en'
-        assert r1[0]['test_locstr'][2][0] == 'Hola'
-        assert r1[0]['test_locstr'][2][1] == 'es'
+        assert isinstance(r1[0]['test_locstr'][0], locstr)
+        assert str(r1[0]['test_locstr'][0]) == 'Hallo'
+        assert str(r1[0]['test_locstr'][1]) == 'Hello'
+        assert str(r1[0]['test_locstr'][2]) == 'Hola'
+        assert r1[0]['test_locstr'][0].lang == 'de'
+        assert r1[0]['test_locstr'][1].lang == 'en'
+        assert r1[0]['test_locstr'][2].lang == 'es'
         # non-functional
         assert len(r1[0]['test_int_list']) == 3
         assert r1[0]['test_int_list'][0] == 9
