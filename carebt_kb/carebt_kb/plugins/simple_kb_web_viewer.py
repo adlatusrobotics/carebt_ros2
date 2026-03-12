@@ -77,7 +77,7 @@ class SimpleWebServer(BaseHTTPRequestHandler):
                     for p in self.__kb.get_properties_of_class(str_clazz):
                         value = individual.get(p['name'], '')
                         length_str = f"length: {len(value)}" if not p['functional'] and value is not None else ""
-                        type_str = f"{p['type']}[]" if not p['functional'] else p['type']
+                        type_str = f"{p['is_a']}[]" if not p['functional'] else p['is_a']
                         col1 = f"<b>{p['name']}</b><br>type: {type_str}<br>{length_str}"
                         
                         # Format value with expand/collapse if long

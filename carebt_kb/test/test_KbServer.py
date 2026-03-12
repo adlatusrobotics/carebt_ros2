@@ -187,7 +187,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
         assert len(result) == 1
 
-        filter = {'type': 'demo1.Person', 'first_name': 'Bob'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'Bob'}
         req = create_delete_request(filter)
         kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         
