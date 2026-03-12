@@ -59,8 +59,11 @@ class KbServer(Node):
         self.__kb = OwlReady2Kb(kb_file, kb_persist)
         self.get_logger().info(f'kb created.')
 
+        # create reentrant callback group for all service callbacks
+        self.reentrant_cb_group = ReentrantCallbackGroup()
+
         # create crud service
-        self.create_service(KbQuery, 'carebt_kb/query', self.__crud_query_callback)
+        self.create_service(KbQuery, 'carebt_kb/query', self.__crud_query_callback, callback_group=self.reentrant_cb_group)
 
         # create wait_state action server
         ActionServer(
