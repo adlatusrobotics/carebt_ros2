@@ -30,21 +30,21 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # subtest
-        subtest = kb.create({'type': 'test.Subtest', 'id': 1})
+        subtest = kb.create({'is_a': 'test.Subtest', 'id': 1})
 
         # subtest list
         subtests = []
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 2}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 2}))
         assert isinstance(subtests[0], str)
         assert subtests[0] == 'test.subtest2'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 3}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 3}))
         assert isinstance(subtests[1], str)
         assert subtests[1] == 'test.subtest3'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 4}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 4}))
         assert isinstance(subtests[2], str)
         assert subtests[2] == 'test.subtest4'
 
-        t1 = kb.create({'type': 'test.Test',
+        t1 = kb.create({'is_a': 'test.Test',
                         # functional
                         'test_int': 1,
                         'test_bool': True,
@@ -73,7 +73,7 @@ class TestOwlReady2Kb_TestOwl():
                         'has_subtest': subtests
                     })
 
-        r1 = kb.read({'type': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test', 'test_int': 1})
         # functional
         assert isinstance(r1[0]['test_int'], int)
         assert r1[0]['test_int'] == 1
@@ -130,8 +130,10 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # Test
-        t = kb.create({'type': 'test.Test', 'test_int': 1})
-        r1 = kb.read({'type': 'test.Test', 'test_int': 1})
+        t = kb.create({'is_a': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test', 'test_int': 1})
+        assert len(r1) == 1
+        assert isinstance(r1[0]['test_int'], int)
 
     def test_read_unknown_slot(self):
         # setup
@@ -139,8 +141,8 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # Test
-        t = kb.create({'type': 'test.Test', 'test_int': 1})
-        r1 = kb.read({'type': 'test.Test', 'xxx': 1})
+        t = kb.create({'is_a': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test', 'xxx': 1})
         assert len(r1) == 0
 
     def test_update(self):
@@ -149,26 +151,26 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # Test
-        kb.create({'type': 'test.Test', 'test_int': 1})
-        r1 = kb.read({'type': 'test.Test'})
+        kb.create({'is_a': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test'})
         assert len(r1) == 1
 
         # subtest
-        subtest = kb.create({'type': 'test.Subtest', 'id': 1})
+        subtest = kb.create({'is_a': 'test.Subtest', 'id': 1})
 
         # subtest list
         subtests = []
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 2}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 2}))
         assert isinstance(subtests[0], str)
         assert subtests[0] == 'test.subtest2'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 3}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 3}))
         assert isinstance(subtests[1], str)
         assert subtests[1] == 'test.subtest3'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 4}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 4}))
         assert isinstance(subtests[2], str)
         assert subtests[2] == 'test.subtest4'
 
-        kb.update({'type': 'test.Test', 'test_int': 1},
+        kb.update({'is_a': 'test.Test', 'test_int': 1},
                   {'test_int': 11,
                    'test_bool': False,
                    'test_float': 11.234,
@@ -196,7 +198,7 @@ class TestOwlReady2Kb_TestOwl():
                    'has_one_subtest': subtest,
                    'has_subtest': subtests
                   })
-        r1 = kb.read({'type': 'test.Test'})
+        r1 = kb.read({'is_a': 'test.Test'})
         assert len(r1) == 1
         # functional
         assert isinstance(r1[0]['test_int'], int)

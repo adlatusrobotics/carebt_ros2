@@ -50,9 +50,12 @@ class OwlReady2Kb():
         items = []
         if len(filter) > 0:
             try:
-                if 'type' in filter:
-                    filter['type'] = eval(f'self.{filter["type"]}')
+                # replace 'is_a' with 'type' for search
+                if 'is_a' in filter:
+                    filter['type'] = eval(f'self.{filter["is_a"]}')
+                    del filter['is_a']
                 items = eval(f'self.{self.__onto}.search(**filter)')
+
             except Exception as ex:
                 pass
         return items
@@ -158,16 +161,16 @@ class OwlReady2Kb():
 
     def __dict_to_typed_dict(self, frame):
         typed_dict = {}
-        typed_dict['type'] = frame['type']
+        typed_dict['is_a'] = frame['is_a']
         for key in frame.keys():
-            if key == 'type':
+            if key == 'is_a':
                 continue
             if eval(f'self.{self.__onto}.{key}') == None:
                 print(f'The key {key} is not part of the ontology.')
                 continue
             if key not in self.OWL_KEYWORDS:
                 range = eval(f'self.{self.__onto}.{key}.range')
-                clazz = frame['type']
+                clazz = frame['is_a']
                 clazz  # supress unused variable warning 
                 is_functional = eval(f'self.{self.__onto}.{key}.is_functional_for(clazz)')
                 key_type = range[0]
@@ -250,7 +253,7 @@ class OwlReady2Kb():
     def __update(self, item, update):
         typed_update = self.__dict_to_typed_dict(update)
         for k in typed_update.keys():
-            if k in ['type']:
+            if k in ['is_a']:
                 continue
             if k not in self.OWL_KEYWORDS:
                 try:
@@ -268,11 +271,11 @@ class OwlReady2Kb():
 
     def create(self, frame) -> str:
         with self.__lock:
-            if 'type' not in frame:
-                print(f'To create a new item a type is required.')
+            if 'is_a' not in frame:
+                print(f'To create a new item is_a is required.')
                 return None
             else:
-                onto_str = f'self.{frame["type"]}()'
+                onto_str = f'self.{frame["is_a"]}()'
                 # create item
                 item = eval(onto_str)
                 # update item
@@ -302,7 +305,7 @@ class OwlReady2Kb():
     def update(self, filter, update) -> None:
         with self.__lock:
             for item in self.__get_items(filter):
-                update['type'] = eval(f'self.{item}.__class__')
+                update['is_a'] = eval(f'self.{item}.__class__')
                 self.__update(item, update)
             self.__sync_to_file()
 
@@ -310,7 +313,7 @@ class OwlReady2Kb():
     def update_items(self, items, update) -> None:
         with self.__lock:
             for item in items:
-                update['type'] = eval(f'self.{item}.__class__')
+                update['is_a'] = eval(f'self.{item}.__class__')
                 self.__update(item, update)
             self.__sync_to_file()
 
@@ -394,7 +397,7 @@ class OwlReady2Kb():
                     if not p.domain or any(d in ancestors for d in p.domain):
                         prop_info = {
                             "name": p.name,
-                            "type": self.get_property_type(p),
+                            "is_a": self.get_property_type(p),
                             "functional": p.is_functional_for(cls)
                         }
                         props_list.append(prop_info)
