@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import threading
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -19,11 +21,51 @@ from action_msgs.msg import GoalStatus
 from carebt.actionNode import ActionNode
 from carebt.nodeStatus import NodeStatus
 from rclpy.action import ActionClient
-from rclpy.action.client import ClientGoalHandle
+from rclpy.action.client import ClientGoalHandle, NumberOfEntities
+from rclpy._rclpy_pybind11 import InvalidHandle, RCLError
 from rclpy.task import Future
+
+_logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from carebt.behaviorTreeRunner import BehaviorTreeRunner  # pragma: no cover
+
+
+class _SafeActionClient(ActionClient):
+    """ActionClient subclass that guards against race conditions with the executor.
+
+    Addresses two race conditions between the BT thread and the executor thread:
+
+    1. **Creation race** – rclpy's ``ActionClient.__init__`` registers the
+       client as a waitable (visible to the executor) *before* assigning
+       ``self._lock``.  Pre-initializing ``_lock`` closes this window.
+
+    2. **Destruction race** – when the BT thread calls ``destroy()`` the
+       underlying handle is invalidated, but the executor may still hold a
+       reference in its snapshot of waitables and call ``get_num_entities``
+       or ``add_to_wait_set`` on the destroyed client.  Overriding both
+       methods to catch the resulting exceptions prevents the crash.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self._lock = threading.Lock()
+        super().__init__(*args, **kwargs)
+
+    def get_num_entities(self) -> NumberOfEntities:
+        """Return number of entities, returning zeros if the handle was destroyed."""
+        try:
+            return super().get_num_entities()
+        except (InvalidHandle, RCLError) as e:
+            _logger.debug('_SafeActionClient.get_num_entities skipped (destroyed): %s', e)
+            return NumberOfEntities(0, 0, 0, 0, 0, 0)
+
+    def add_to_wait_set(self, wait_set) -> None:
+        """Add entities to wait set, silently skipping if the handle was destroyed."""
+        try:
+            super().add_to_wait_set(wait_set)
+        except (InvalidHandle, RCLError) as e:
+            _logger.debug('_SafeActionClient.add_to_wait_set skipped (destroyed): %s', e)
+
 
 class RosActionClientActionNode(ActionNode):
 
@@ -36,7 +78,7 @@ class RosActionClientActionNode(ActionNode):
         self.set_status(NodeStatus.IDLE)
         self._goal_handle: ClientGoalHandle = None
         self._goal_msg = action_type.Goal()
-        self._action_client = ActionClient(bt_runner.node, action_type, action_name)
+        self._action_client = _SafeActionClient(bt_runner.node, action_type, action_name)
         self.get_logger().debug('{} - action_client.wait_for_server...'
                                 .format(self.__class__.__name__))
         self._action_client.wait_for_server()  # TODO: Timeout
@@ -65,6 +107,7 @@ class RosActionClientActionNode(ActionNode):
         if hasattr(self, '_get_result_future') and self._get_result_future is not None:
             self._get_result_future._callbacks = []
         self._action_client._feedback_callbacks = {}
+        self._action_client.destroy()
         super()._internal_on_delete()
 
     def _internal_result_callback(self, future: Future) -> None:
