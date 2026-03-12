@@ -111,11 +111,18 @@ class OwlReady2Kb():
             elif issubclass(key_type, (str)):
                 if prop.name.endswith('_rosstr'):
                     if is_functional:
-                        dict_str += f'\'{prop.name}\': {value}, '
+                        try:
+                            ros_value = json.loads(value)
+                        except (TypeError, json.JSONDecodeError):
+                            ros_value = value
+                        dict_str += f'\'{prop.name}\': {ros_value}, '
                     else:
                         v_list = []
                         for v in value:
-                            v_list.append(eval(v))
+                            try:
+                                v_list.append(json.loads(v))
+                            except (TypeError, json.JSONDecodeError):
+                                v_list.append(v)
                         dict_str += f'\'{prop.name}\': {v_list}, '
                 else:
                     if is_functional:
