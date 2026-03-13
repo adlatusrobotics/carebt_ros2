@@ -107,7 +107,14 @@ class RosActionClientActionNode(ActionNode):
         if hasattr(self, '_get_result_future') and self._get_result_future is not None:
             self._get_result_future._callbacks = []
         self._action_client._feedback_callbacks = {}
-        self._action_client.destroy()
+        # Do NOT call self._action_client.destroy() here.
+        # destroy() invalidates the underlying C handle immediately, but the
+        # executor thread may still hold a reference to this waitable in its
+        # snapshot and crash when it tries to poll it.  Instead, just
+        # deregister the client from the node so the executor won't pick it up
+        # in future spin cycles.  The C handle stays valid; Python GC will
+        # clean it up once all references are gone.
+        self.bt_runner.node.remove_waitable(self._action_client)
         super()._internal_on_delete()
 
     def _internal_result_callback(self, future: Future) -> None:
