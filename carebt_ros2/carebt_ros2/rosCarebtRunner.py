@@ -21,6 +21,8 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
+from carebt_ros2.rosLogger import RosLogger
+
 ########################################################################
 
 
@@ -33,6 +35,7 @@ class _BtNode(Thread):
         # Use a MultiThreadedExecutor to enable processing goals concurrently
         self.__executor = MultiThreadedExecutor()
         self.__bt_runner = BehaviorTreeRunner()
+        self.__bt_runner.set_logger(RosLogger(self.__ros_node.get_logger()))
         self.__bt_runner.get_logger().set_log_level(LogLevel.INFO)
 
     def thread(self):
