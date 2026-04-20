@@ -330,4 +330,4 @@ class ServiceClient(ActionNode):
         else:
             self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
-            self.get_logger().warn('service not available')
+            self.get_logger().warn(f'service not available: {self._service}')
