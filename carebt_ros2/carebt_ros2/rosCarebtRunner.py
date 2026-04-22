@@ -21,6 +21,7 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
+from carebt_ros2.rosClientManager import RosClientManager
 from carebt_ros2.rosLogger import RosLogger
 
 ########################################################################
@@ -57,8 +58,14 @@ class RosCarebtRunner(Node):
         rclpy.init(args=None)
         Node.__init__(self, node_name)
 
+        self.client_manager = RosClientManager(self)
+
         self.__btNode = _BtNode(self)
         self.__btNode.start()
+
+    def destroy_node(self) -> bool:
+        self.client_manager.shutdown()
+        return super().destroy_node()
 
     def run(self, node: TreeNode, params: str = None) -> None:
         """

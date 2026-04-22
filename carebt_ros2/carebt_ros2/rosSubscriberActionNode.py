@@ -30,7 +30,8 @@ class RosSubscriberActionNode(ActionNode):
                  topic_name: str,
                  params: str = None):
         super().__init__(bt_runner, params)
-        self.__subscriber = bt_runner.node.create_subscription(
+        self.__client_manager = bt_runner.node.client_manager
+        self.__sub_token = self.__client_manager.subscribe(
             topic_type,
             topic_name,
             self.__topic_callback,
@@ -39,6 +40,10 @@ class RosSubscriberActionNode(ActionNode):
 
     def __topic_callback(self, msg):
         self.topic_callback(msg)
+
+    def _internal_on_delete(self) -> None:
+        self.__client_manager.unsubscribe(self.__sub_token)
+        super()._internal_on_delete()
 
     # PUBLIC
 
