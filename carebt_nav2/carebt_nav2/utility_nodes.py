@@ -16,11 +16,11 @@ from carebt.actionNode import ActionNode
 from carebt.nodeStatus import NodeStatus
 from carebt_ros2.rosSubscriberActionNode import RosSubscriberActionNode
 from lifecycle_msgs.srv import ChangeState, GetState
-from rcl_interfaces.srv import SetParameters
+from rcl_interfaces.srv import GetParameters, SetParameters
 from std_msgs.msg import Empty
 from threading import Timer, Thread
 from time import sleep
-from rclpy.parameter import Parameter 
+from rclpy.parameter import Parameter, parameter_value_to_python
 
 ########################################################################
 
@@ -288,6 +288,53 @@ class SetParameterListClient(ActionNode):
             else:
                 self.set_status(NodeStatus.FAILURE)
                 self.set_contingency_message('PARAM_NOT_SET')
+        else:
+            self.set_status(NodeStatus.FAILURE)
+            self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+
+
+class GetParameterClient(ActionNode):
+    """Get the parameter (name/value) of the node.
+
+    Input Parameters
+    ----------------
+    ?node : str
+        The nodes name
+    ?param_name : str
+        The parameters name
+
+    """
+
+    def __init__(self, bt_runner):
+        super().__init__(bt_runner, '?node ?param_name => ?param_value')
+        self.__bt_runner = bt_runner
+
+    def on_init(self) -> None:
+        self.get_logger().info('{} - {} get param {}'
+                               .format(self.__class__.__name__,
+                                       self._node,
+                                       self._param_name))
+        self.set_status(NodeStatus.SUSPENDED)
+        Thread(target=self.__worker, daemon=True).start()
+        
+    def __worker(self):
+        self.__client = self.__bt_runner.node.create_client(GetParameters,
+                                                            f'/{self._node}/get_parameters')
+        if(self.__client.wait_for_service(timeout_sec=1.0)):
+            req = GetParameters.Request()
+            req.names = [self._param_name]
+            resp = self.__client.call(req)
+            if len(resp.values) > 0:
+                self.set_status(NodeStatus.SUCCESS)
+                self._param_value = parameter_value_to_python(resp.values[0])
+                self.get_logger().info('{} - {} got param {} with value {}'
+                                       .format(self.__class__.__name__,
+                                               self._node,
+                                               self._param_name,
+                                               self._param_value))
+            else:
+                self.set_status(NodeStatus.FAILURE)
+                self.set_contingency_message('PARAM_NOT_FOUND')
         else:
             self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
