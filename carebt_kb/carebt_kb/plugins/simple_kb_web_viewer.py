@@ -36,7 +36,7 @@ class SimpleWebServer(BaseHTTPRequestHandler):
         # start HTML
         self.wfile.write(bytes("<html>\
             <head>\
-                <title>careBT web view</title>\
+                <title>careBT KB web view</title>\
             <style>\
                 table, th, td { border: 1px solid black; }\
                 table {padding: 10px;}\
