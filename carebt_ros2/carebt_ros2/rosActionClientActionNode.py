@@ -61,6 +61,19 @@ class RosActionClientActionNode(ActionNode):
     def _internal_on_abort(self) -> None:
         if self._goal_handle is not None:
             self._goal_handle.cancel_goal()
+        elif hasattr(self, '_goal_future') and self._goal_future is not None:
+            # goal sent but server hasn't responded yet. Replace the response callback with a 
+            # standalone closure that cancels the goal.
+            self._goal_future._callbacks = []
+            logger = self.get_logger()
+
+            def _cancel_on_accept(future: Future):
+                goal_handle = future.result()
+                if goal_handle.accepted:
+                    logger.info(f'{self.__class__.__name__} - cancelling goal after late accept')
+                    goal_handle.cancel_goal()
+
+            self._goal_future.add_done_callback(_cancel_on_accept)
         super()._internal_on_abort()
 
     def _internal_on_delete(self) -> None:
