@@ -18,12 +18,13 @@ from typing import TYPE_CHECKING
 from action_msgs.msg import GoalStatus
 from carebt.actionNode import ActionNode
 from carebt.nodeStatus import NodeStatus
-from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from rclpy.task import Future
 
+
 if TYPE_CHECKING:
     from carebt.behaviorTreeRunner import BehaviorTreeRunner  # pragma: no cover
+
 
 class RosActionClientActionNode(ActionNode):
 
@@ -34,9 +35,10 @@ class RosActionClientActionNode(ActionNode):
                  params: str = None):
         super().__init__(bt_runner, params)
         self.set_status(NodeStatus.IDLE)
-        self._goal_handle: ClientGoalHandle
+        self._goal_handle: ClientGoalHandle = None
         self._goal_msg = action_type.Goal()
-        self._action_client = ActionClient(bt_runner.node, action_type, action_name)
+        self._action_client = bt_runner.node.client_manager \
+            .get_or_create_action_client(action_type, action_name)
         self.get_logger().debug('{} - action_client.wait_for_server...'
                                 .format(self.__class__.__name__))
         self._action_client.wait_for_server()  # TODO: Timeout
@@ -57,13 +59,32 @@ class RosActionClientActionNode(ActionNode):
     # PROTECTED
 
     def _internal_on_abort(self) -> None:
-        self._goal_handle.cancel_goal()
+        if self._goal_handle is not None:
+            self._goal_handle.cancel_goal()
+        elif hasattr(self, '_goal_future') and self._goal_future is not None:
+            # goal sent but server hasn't responded yet. Replace the response callback with a 
+            # standalone closure that cancels the goal.
+            self._goal_future._callbacks = []
+            logger = self.get_logger()
+
+            def _cancel_on_accept(future: Future):
+                goal_handle = future.result()
+                if goal_handle.accepted:
+                    logger.info(f'{self.__class__.__name__} - cancelling goal after late accept')
+                    goal_handle.cancel_goal()
+
+            self._goal_future.add_done_callback(_cancel_on_accept)
         super()._internal_on_abort()
 
     def _internal_on_delete(self) -> None:
-        if self._get_result_future is not None:
+        if hasattr(self, '_get_result_future') and self._get_result_future is not None:
             self._get_result_future._callbacks = []
-        self._action_client._feedback_callbacks = {}
+        # The ActionClient is shared via RosClientManager, so we must only
+        # remove this instance's feedback callback entry (keyed by goal UUID)
+        # rather than wiping the whole _feedback_callbacks dict.
+        if self._goal_handle is not None:
+            uuid_key = bytes(self._goal_handle.goal_id.uuid)
+            self._action_client._feedback_callbacks.pop(uuid_key, None)
         super()._internal_on_delete()
 
     def _internal_result_callback(self, future: Future) -> None:

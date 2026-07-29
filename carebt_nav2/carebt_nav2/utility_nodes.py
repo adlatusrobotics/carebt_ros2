@@ -16,12 +16,11 @@ from carebt.actionNode import ActionNode
 from carebt.nodeStatus import NodeStatus
 from carebt_ros2.rosSubscriberActionNode import RosSubscriberActionNode
 from lifecycle_msgs.srv import ChangeState, GetState
-from rcl_interfaces.msg import Parameter
-from rcl_interfaces.srv import SetParameters
-from ros2param.api import get_value
+from rcl_interfaces.srv import GetParameters, SetParameters
 from std_msgs.msg import Empty
 from threading import Timer, Thread
 from time import sleep
+from rclpy.parameter import Parameter, parameter_value_to_python
 
 ########################################################################
 
@@ -114,6 +113,23 @@ class WaitForUserInput(RosSubscriberActionNode):
 
 class LifecycleClient(ActionNode):
     """Changes the state of a Lifecycle Node.
+    Transition ids:
+    0: create
+    1: configure
+    2: cleanup
+    3: activate
+    4: deactivate
+    5: unconfigured_shutdown
+    6: inactive_shutdown
+    7: active_shutdown
+    8: destroy
+    
+    State ids:
+    0: unknown
+    1: unconfigured
+    2: inactive
+    3: active
+    4: finalized
 
     Input Parameters
     ----------------
@@ -134,7 +150,8 @@ class LifecycleClient(ActionNode):
                                .format(self.__class__.__name__, self._node, self._id))
         self.set_status(NodeStatus.SUSPENDED)
         self.__thread_running = True
-        self.__expected_goal_state = [0, 2, 1, 3, 2, 4, 4, 4][self._id]
+        # self.__expected_goal_state = [0, 2, 1, 3, 2, 4, 4, 4][self._id]
+        self.__expected_goal_state = [1, 2, 1, 3, 2, 4, 4, 4, None][self._id]
         Thread(target=self.__worker, daemon=True).start()
         
     def __worker(self):
@@ -209,14 +226,13 @@ class SetParameterClient(ActionNode):
         self.__client = self.__bt_runner.node.create_client(SetParameters,
                                                             f'/{self._node}/set_parameters')
         if(self.__client.wait_for_service(timeout_sec=1.0)):
-            param = Parameter()
-            param.name = self._param_name
-            param.value = get_value(string_value=self._param_value)
+            param = Parameter(name=self._param_name, value=self._param_value)
 
             req = SetParameters.Request()
-            req.parameters = [param]
-
+            req.parameters = [param.to_parameter_msg()]
+            self.get_logger().info(f'Calling set_parameters service with {req.parameters}...')
             resp = self.__client.call(req)
+
             if resp.results[0].successful:
                 self.set_status(NodeStatus.SUCCESS)
             else:
@@ -228,38 +244,98 @@ class SetParameterClient(ActionNode):
 
 ########################################################################
 
-
-class ServiceClient(ActionNode):
-    """Call a ROS2 service.
+class SetParameterListClient(ActionNode):
+    """Set the parameter (name/value) of the node.
 
     Input Parameters
     ----------------
-    ?service : str
-        The ROS2 service name
-    ?request
-        The service request msg
+    ?node : str
+        The nodes name
+    ?param_name : str
+        The parameters name
+    ?param_value
+        The parameters value
 
     """
 
     def __init__(self, bt_runner):
-        super().__init__(bt_runner, '?service ?type ?request => ?response')
+        super().__init__(bt_runner, '?node ?param_list')
         self.__bt_runner = bt_runner
 
     def on_init(self) -> None:
-        self.get_logger().info('{} - call service {} with {} - {}'
+        self.get_logger().info('{} - {} setting params {}'
                                .format(self.__class__.__name__,
-                                       self._service,
-                                       self._type,
-                                       self._request))
+                                       self._node,
+                                       [(param.name,param.value) for param in self._param_list]))
         self.set_status(NodeStatus.SUSPENDED)
         Thread(target=self.__worker, daemon=True).start()
-
+        
     def __worker(self):
-        self.__client = self.__bt_runner.node.create_client(self._type, self._service)
+        self.__client = self.__bt_runner.node.create_client(SetParameters,
+                                                            f'/{self._node}/set_parameters')
         if(self.__client.wait_for_service(timeout_sec=1.0)):
-            req = self._request
-            self._response = self.__client.call(req)
-            self.set_status(NodeStatus.SUCCESS)
+            parameter_msgs = []
+            for param in self._param_list:
+                if isinstance(param, Parameter): parameter_msgs.append(param.to_parameter_msg())
+                else: self.get_logger().warn(f"Parameter {param} is not of type rclpy.Parameter and will be ignored.")
+
+            req = SetParameters.Request()
+            req.parameters = parameter_msgs
+
+            resp = self.__client.call(req)
+            if all(resp.results[i].successful for i in range(len(resp.results))):
+                self.set_status(NodeStatus.SUCCESS)
+            else:
+                self.set_status(NodeStatus.FAILURE)
+                self.set_contingency_message('PARAM_NOT_SET')
         else:
             self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+
+
+class GetParameterClient(ActionNode):
+    """Get the parameter (name/value) of the node.
+
+    Input Parameters
+    ----------------
+    ?node : str
+        The nodes name
+    ?param_name : str
+        The parameters name
+
+    """
+
+    def __init__(self, bt_runner):
+        super().__init__(bt_runner, '?node ?param_name => ?param_value')
+        self.__bt_runner = bt_runner
+
+    def on_init(self) -> None:
+        self.get_logger().info('{} - {} get param {}'
+                               .format(self.__class__.__name__,
+                                       self._node,
+                                       self._param_name))
+        self.set_status(NodeStatus.SUSPENDED)
+        Thread(target=self.__worker, daemon=True).start()
+        
+    def __worker(self):
+        self.__client = self.__bt_runner.node.create_client(GetParameters,
+                                                            f'/{self._node}/get_parameters')
+        if(self.__client.wait_for_service(timeout_sec=1.0)):
+            req = GetParameters.Request()
+            req.names = [self._param_name]
+            resp = self.__client.call(req)
+            if len(resp.values) > 0:
+                self.set_status(NodeStatus.SUCCESS)
+                self._param_value = parameter_value_to_python(resp.values[0])
+                self.get_logger().info('{} - {} got param {} with value {}'
+                                       .format(self.__class__.__name__,
+                                               self._node,
+                                               self._param_name,
+                                               self._param_value))
+            else:
+                self.set_status(NodeStatus.FAILURE)
+                self.set_contingency_message('PARAM_NOT_FOUND')
+        else:
+            self.set_status(NodeStatus.FAILURE)
+            self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+

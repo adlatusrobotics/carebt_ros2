@@ -16,36 +16,30 @@ from typing import TYPE_CHECKING
 
 from carebt.actionNode import ActionNode
 from carebt.nodeStatus import NodeStatus
+from rclpy.service import Service
 
 
 if TYPE_CHECKING:
     from carebt.behaviorTreeRunner import BehaviorTreeRunner  # pragma: no cover
 
 
-class RosSubscriberActionNode(ActionNode):
-
+class RosServiceServerActionNode(ActionNode):
     def __init__(self,
                  bt_runner: 'BehaviorTreeRunner',
-                 topic_type,
-                 topic_name: str,
+                 service_type,
+                 service_name: str,
                  params: str = None):
         super().__init__(bt_runner, params)
-        self.__client_manager = bt_runner.node.client_manager
-        self.__sub_token = self.__client_manager.subscribe(
-            topic_type,
-            topic_name,
-            self.__topic_callback,
-            10)
+        self.service: Service = bt_runner.node.create_service(
+            service_type, service_name, self.service_callback
+        )
+
+    def on_tick(self) -> None:
         self.set_status(NodeStatus.SUSPENDED)
 
-    def __topic_callback(self, msg):
-        self.topic_callback(msg)
+    def on_delete(self) -> None:
+        self.service.callback = None
+        self.service.destroy()
 
-    def _internal_on_delete(self) -> None:
-        self.__client_manager.unsubscribe(self.__sub_token)
-        super()._internal_on_delete()
-
-    # PUBLIC
-
-    def topic_callback(self, msg) -> None:
+    def service_callback(self, request, response):
         pass

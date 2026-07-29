@@ -40,37 +40,37 @@ class TestKbServer():
         kbserver = KbServer('carebt_kb')
 
         # check Grace
-        filter = {'type': 'demo1.Person', 'first_name': 'Grace'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'Grace'}
         req = create_read_request(filter)
         res = kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         result = dict_from_kb_response(res)
         assert len(result) == 0
 
         # create
-        frame = {'type': 'demo1.Person', 'first_name': 'Grace', 'age': 25, 'size': 1.66, 'weight': 52.5}
+        frame = {'is_a': 'demo1.Person', 'first_name': 'Grace', 'age': 25, 'size': 1.66, 'weight': 52.5}
         req = create_create_request(frame)
         kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
 
         # read Grace
-        filter = {'type': 'demo1.Person', 'first_name': 'Grace'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'Grace'}
         req = create_read_request(filter)
         res = kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         result = dict_from_kb_response(res)
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Grace'
 
     def test_read_bob(self, execute_before_any_test):
         kbserver = KbServer('carebt_kb')
 
-        filter = {'type': 'demo1.Person', 'first_name': 'Bob'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'Bob'}
         req = create_read_request(filter)
         res = kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 21
@@ -80,7 +80,7 @@ class TestKbServer():
     def test_read_xxx(self, execute_before_any_test):
         kbserver = KbServer('carebt_kb')
 
-        filter = {'type': 'demo1.Person', 'first_name': 'XXX'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'XXX'}
         req = create_read_request(filter)
         res = kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         result = dict_from_kb_response(res)
@@ -96,7 +96,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 21
@@ -121,14 +121,14 @@ class TestKbServer():
     def test_update_age_of_bob(self, execute_before_any_test):
         kbserver = KbServer('carebt_kb')
 
-        filter = {'type': 'demo1.Person', 'first_name': 'Bob'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'Bob'}
         data = {'age': 55}
         req = create_update_request(filter, data)
         res = kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 55
@@ -145,7 +145,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
 
         assert len(result) == 1
-        assert len(result[0]) == 6
+        assert len(result[0]) == 7
         assert result[0]['is_a'] == ['demo1.Person']
         assert result[0]['first_name'] == 'Bob'
         assert result[0]['age'] == 55
@@ -155,7 +155,7 @@ class TestKbServer():
     def test_update_add_pose_to_robot_1(self, execute_before_any_test):
         kbserver = KbServer('carebt_kb')
 
-        filter = {'type': 'demo1.Robot', 'robot_id': 1}
+        filter = {'is_a': 'demo1.Robot', 'robot_id': 1}
         p = PoseStamped()
         p.pose.position.x = 1.0
         p.pose.position.y = 2.0
@@ -170,7 +170,7 @@ class TestKbServer():
         p: PoseStamped = message_converter.convert_dictionary_to_ros_message('geometry_msgs/msg/PoseStamped', result[0]['pose_rosstr'])
         
         assert len(result) == 1
-        assert len(result[0]) == 5
+        assert len(result[0]) == 6
         assert result[0]['robot_id'] == 1
         assert result[0]['is_a'] == ['demo1.Robot']
         assert result[0]['status'] == 'Happy'
@@ -187,7 +187,7 @@ class TestKbServer():
         result = dict_from_kb_response(res)
         assert len(result) == 1
 
-        filter = {'type': 'demo1.Person', 'first_name': 'Bob'}
+        filter = {'is_a': 'demo1.Person', 'first_name': 'Bob'}
         req = create_delete_request(filter)
         kbserver._KbServer__crud_query_callback(req, KbQuery.Response())
         

@@ -21,6 +21,9 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
+from carebt_ros2.rosClientManager import RosClientManager
+from carebt_ros2.rosLogger import RosLogger
+
 ########################################################################
 
 
@@ -33,6 +36,7 @@ class _BtNode(Thread):
         # Use a MultiThreadedExecutor to enable processing goals concurrently
         self.__executor = MultiThreadedExecutor()
         self.__bt_runner = BehaviorTreeRunner()
+        self.__bt_runner.set_logger(RosLogger(self.__ros_node.get_logger()))
         self.__bt_runner.get_logger().set_log_level(LogLevel.INFO)
 
     def thread(self):
@@ -54,8 +58,14 @@ class RosCarebtRunner(Node):
         rclpy.init(args=None)
         Node.__init__(self, node_name)
 
+        self.client_manager = RosClientManager(self)
+
         self.__btNode = _BtNode(self)
         self.__btNode.start()
+
+    def destroy_node(self) -> bool:
+        self.client_manager.shutdown()
+        return super().destroy_node()
 
     def run(self, node: TreeNode, params: str = None) -> None:
         """

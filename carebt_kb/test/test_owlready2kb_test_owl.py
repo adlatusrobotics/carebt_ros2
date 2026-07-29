@@ -15,7 +15,7 @@
 import datetime
 import math
 from carebt_kb.owlready2_kb import OwlReady2Kb
-
+from owlready2 import locstr
 
 class TestOwlReady2Kb_TestOwl():
 
@@ -30,21 +30,21 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # subtest
-        subtest = kb.create({'type': 'test.Subtest', 'id': 1})
+        subtest = kb.create({'is_a': 'test.Subtest', 'id': 1})
 
         # subtest list
         subtests = []
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 2}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 2}))
         assert isinstance(subtests[0], str)
         assert subtests[0] == 'test.subtest2'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 3}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 3}))
         assert isinstance(subtests[1], str)
         assert subtests[1] == 'test.subtest3'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 4}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 4}))
         assert isinstance(subtests[2], str)
         assert subtests[2] == 'test.subtest4'
 
-        t1 = kb.create({'type': 'test.Test',
+        t1 = kb.create({'is_a': 'test.Test',
                         # functional
                         'test_int': 1,
                         'test_bool': True,
@@ -55,7 +55,11 @@ class TestOwlReady2Kb_TestOwl():
                         'test_time': datetime.time(21, 55, 59, 123456),
                         'test_normstr': 'This is a normstring.',
                         # locstr
-                        'test_locstr': [('German', 'de'), ('English', 'en'), ('Spanish', 'es')],
+                        'test_locstr': [
+                            locstr('German', 'de'),
+                            locstr('English', 'en'),
+                            locstr('Spanish', 'es')
+                        ],
                         # non-functional
                         'test_int_list': [1,2,3],
                         'test_bool_list': [True, False, True],
@@ -69,7 +73,7 @@ class TestOwlReady2Kb_TestOwl():
                         'has_subtest': subtests
                     })
 
-        r1 = kb.read({'type': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test', 'test_int': 1})
         # functional
         assert isinstance(r1[0]['test_int'], int)
         assert r1[0]['test_int'] == 1
@@ -89,9 +93,13 @@ class TestOwlReady2Kb_TestOwl():
         assert r1[0]['test_normstr'] == 'This is a normstring.'
         # locstr
         assert isinstance(r1[0]['test_locstr'], list)
-        assert isinstance(r1[0]['test_locstr'][0], tuple)
-        assert isinstance(r1[0]['test_locstr'][0][0], str)
-        assert isinstance(r1[0]['test_locstr'][0][1], str)
+        assert isinstance(r1[0]['test_locstr'][0], locstr)
+        assert str(r1[0]['test_locstr'][0]) == 'German'
+        assert str(r1[0]['test_locstr'][1]) == 'English'
+        assert str(r1[0]['test_locstr'][2]) == 'Spanish'
+        assert r1[0]['test_locstr'][0].lang == 'de'
+        assert r1[0]['test_locstr'][1].lang == 'en'
+        assert r1[0]['test_locstr'][2].lang == 'es'
         # non-functional
         assert len(r1[0]['test_int_list']) == 3
         assert r1[0]['test_int_list'][0] == 1
@@ -122,8 +130,10 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # Test
-        t = kb.create({'type': 'test.Test', 'test_int': 1})
-        r1 = kb.read({'type': 'test.Test', 'test_int': 1})
+        t = kb.create({'is_a': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test', 'test_int': 1})
+        assert len(r1) == 1
+        assert isinstance(r1[0]['test_int'], int)
 
     def test_read_unknown_slot(self):
         # setup
@@ -131,8 +141,8 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # Test
-        t = kb.create({'type': 'test.Test', 'test_int': 1})
-        r1 = kb.read({'type': 'test.Test', 'xxx': 1})
+        t = kb.create({'is_a': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test', 'xxx': 1})
         assert len(r1) == 0
 
     def test_update(self):
@@ -141,26 +151,26 @@ class TestOwlReady2Kb_TestOwl():
         assert len(list(kb.test.individuals())) == 0
 
         # Test
-        kb.create({'type': 'test.Test', 'test_int': 1})
-        r1 = kb.read({'type': 'test.Test'})
+        kb.create({'is_a': 'test.Test', 'test_int': 1})
+        r1 = kb.read({'is_a': 'test.Test'})
         assert len(r1) == 1
 
         # subtest
-        subtest = kb.create({'type': 'test.Subtest', 'id': 1})
+        subtest = kb.create({'is_a': 'test.Subtest', 'id': 1})
 
         # subtest list
         subtests = []
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 2}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 2}))
         assert isinstance(subtests[0], str)
         assert subtests[0] == 'test.subtest2'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 3}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 3}))
         assert isinstance(subtests[1], str)
         assert subtests[1] == 'test.subtest3'
-        subtests.append(kb.create({'type': 'test.Subtest', 'id': 4}))
+        subtests.append(kb.create({'is_a': 'test.Subtest', 'id': 4}))
         assert isinstance(subtests[2], str)
         assert subtests[2] == 'test.subtest4'
 
-        kb.update({'type': 'test.Test', 'test_int': 1},
+        kb.update({'is_a': 'test.Test', 'test_int': 1},
                   {'test_int': 11,
                    'test_bool': False,
                    'test_float': 11.234,
@@ -170,7 +180,10 @@ class TestOwlReady2Kb_TestOwl():
                    'test_time': datetime.time(23, 59, 59, 112233),
                    'test_normstr': 'This is a normstring.',
                    # locstr
-                   'test_locstr': [('Hallo', 'de'), ('Hello', 'en'), ('Hola', 'es')],
+                   'test_locstr': [
+                       locstr('Hallo', 'de'),
+                       locstr('Hello', 'en'),
+                       locstr('Hola', 'es')],
                    # non-functional
                    'test_int_list': [9,8,7],
                    'test_bool_list': [False, True, False],
@@ -185,7 +198,7 @@ class TestOwlReady2Kb_TestOwl():
                    'has_one_subtest': subtest,
                    'has_subtest': subtests
                   })
-        r1 = kb.read({'type': 'test.Test'})
+        r1 = kb.read({'is_a': 'test.Test'})
         assert len(r1) == 1
         # functional
         assert isinstance(r1[0]['test_int'], int)
@@ -204,15 +217,13 @@ class TestOwlReady2Kb_TestOwl():
         assert r1[0]['test_time'] == datetime.time(23, 59, 59, 112233)
         # locstr
         assert isinstance(r1[0]['test_locstr'], list)
-        assert isinstance(r1[0]['test_locstr'][0], tuple)
-        assert isinstance(r1[0]['test_locstr'][0][0], str)
-        assert isinstance(r1[0]['test_locstr'][0][1], str)
-        assert r1[0]['test_locstr'][0][0] == 'Hallo'
-        assert r1[0]['test_locstr'][0][1] == 'de'
-        assert r1[0]['test_locstr'][1][0] == 'Hello'
-        assert r1[0]['test_locstr'][1][1] == 'en'
-        assert r1[0]['test_locstr'][2][0] == 'Hola'
-        assert r1[0]['test_locstr'][2][1] == 'es'
+        assert isinstance(r1[0]['test_locstr'][0], locstr)
+        assert str(r1[0]['test_locstr'][0]) == 'Hallo'
+        assert str(r1[0]['test_locstr'][1]) == 'Hello'
+        assert str(r1[0]['test_locstr'][2]) == 'Hola'
+        assert r1[0]['test_locstr'][0].lang == 'de'
+        assert r1[0]['test_locstr'][1].lang == 'en'
+        assert r1[0]['test_locstr'][2].lang == 'es'
         # non-functional
         assert len(r1[0]['test_int_list']) == 3
         assert r1[0]['test_int_list'][0] == 9
