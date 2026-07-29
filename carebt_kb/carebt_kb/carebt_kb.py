@@ -42,7 +42,9 @@ class KbServer(Node):
     def __init__(self, node_name: str):
         super().__init__(node_name)
 
-        self.__event = threading.Event()
+        self.__condition = threading.Condition()
+        self.__pending_goals = []
+        self.__pending_lock = threading.Lock()
 
         # declare parameters
         self.declare_parameter(KB_FILE_PARAM, 'src/carebt_ros2/carebt_kb/test/data/person.owl')
@@ -71,8 +73,8 @@ class KbServer(Node):
             KbEvalState,
             'carebt_kb/wait_eval_state',
             callback_group=ReentrantCallbackGroup(),
-            execute_callback=self.__wait_eval_state_execute_callback,
-            cancel_callback=self.__wait_eval_state_cancel_callback)
+            cancel_callback=self.__wait_eval_state_cancel_callback,
+            handle_accepted_callback=self.__handle_accepted_callback)
 
         # create plugins
         self.__plugins = []
@@ -85,31 +87,63 @@ class KbServer(Node):
             plugin_class = import_class(plugin_type)
             self.__plugins.append(plugin_class(self, plugin))
 
+        # Start evaluator worker thread
+        self.__eval_thread = threading.Thread(target=self.__evaluator_loop, daemon=True, name='eval_worker')
+        self.__eval_thread.start()
+
     def __kb_updated(self):
-        self.__event.set()
-        self.__event.clear()
+        with self.__condition:
+            self.__condition.notify_all()
         for plugin in self.__plugins:
             plugin.on_update_callback()
 
     ## wait_eval_state action-server callbacks
 
-    def __wait_eval_state_execute_callback(self, goal_handle: ServerGoalHandle):
+    def __handle_accepted_callback(self, goal_handle: ServerGoalHandle):
+        """Store goal for pooled evaluation."""
+        self.get_logger().info(f'handle_accepted_callback -- Received goal: {goal_handle.request.filter}, {goal_handle.request.eval}')
+        goal_handle.executing()
+        with self.__pending_lock:
+            self.__pending_goals.append(goal_handle)
+        # Wake evaluators for immediate check
+        with self.__condition:
+            self.__condition.notify_all()
+
+    def __evaluator_loop(self):
+        """Worker thread that evaluates all pending goals."""
         while True:
-            goal: KbEvalState.Goal = goal_handle.request
+            with self.__condition:
+                self.__condition.wait(timeout=1.0)
+            self.__evaluate_pending_goals()
+
+    def __evaluate_pending_goals(self):
+        with self.__pending_lock:
+            goals = list(self.__pending_goals)
+
+        if not goals:
+            return
+
+        completed = []
+        for goal_handle in goals:
             if not goal_handle.is_active:
-                self.get_logger().info("execute_callback -- Goal aborted")
-                return KbEvalState.Result()
+                completed.append(goal_handle)
+                continue
 
             if goal_handle.is_cancel_requested:
-                goal_handle.canceled()
-                self.get_logger().info("execute_callback -- Goal canceled")
-                return KbEvalState.Result()
+                goal_handle.canceled(KbEvalState.Result())
+                self.get_logger().info('evaluate -- Goal canceled')
+                completed.append(goal_handle)
+                continue
 
-            filter = json.loads(goal.filter)
-            result = self.read(filter)
+            goal = goal_handle.request
+            filter_dict = json.loads(goal.filter)
+            result = self.read(filter_dict)
             try:
-                if(eval(goal.eval)):
-                    break
+                if eval(goal.eval):
+                    goal_handle.succeed(KbEvalState.Result())
+                    self.get_logger().info(
+                        f'evaluate -- Goal succeeded: {goal.filter}, {goal.eval}')
+                    completed.append(goal_handle)
             except Exception as e:
                 msg = f'eval: {goal.eval} -- EXCEPTION: {e}'
                 self.get_logger().warn(msg)
@@ -118,14 +152,16 @@ class KbServer(Node):
                 feedback_msg.message = msg
                 goal_handle.publish_feedback(feedback_msg)
 
-            self.__event.wait()
-
-        goal_handle.succeed()
-        result = KbEvalState.Result()
-        return result
+        if completed:
+            with self.__pending_lock:
+                for g in completed:
+                    self.__pending_goals.remove(g)
 
     def __wait_eval_state_cancel_callback(self, goal_handle):
         self.get_logger().info(f'cancel_callback -- Received cancel request: {goal_handle}')
+        # Wake evaluators to process the cancellation
+        with self.__condition:
+            self.__condition.notify_all()
         return CancelResponse.ACCEPT
 
     ## CRUD query callback
@@ -236,8 +272,7 @@ def main(args=None):
     rclpy.init(args=args)
     node = KbServer('carebt_kb')
 
-    # Use a MultiThreadedExecutor to enable processing goals concurrently
-    executor = MultiThreadedExecutor(num_threads=25)  # TODO threads as param
+    executor = MultiThreadedExecutor()
     rclpy.spin(node, executor=executor)
 
     rclpy.shutdown()
