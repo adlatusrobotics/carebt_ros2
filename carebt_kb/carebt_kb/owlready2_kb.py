@@ -115,7 +115,7 @@ class OwlReady2Kb():
                             ros_value = json.loads(value)
                         except (TypeError, json.JSONDecodeError):
                             ros_value = value
-                        dict_str += f'\'{prop.name}\': {ros_value}, '
+                        dict_str += f'\'{prop.name}\': {repr(ros_value)}, '
                     else:
                         v_list = []
                         for v in value:
@@ -211,11 +211,12 @@ class OwlReady2Kb():
                     # if the str is a ROS str
                     if key.endswith('_rosstr'):
                         if is_functional:
-                            typed_dict[key] = f'"{json.loads(json.dumps(frame[key]))}"'
+                            value = frame[key] if isinstance(frame[key], str) else json.dumps(frame[key])
+                            typed_dict[key] = repr(value)
                         else:
                             str_value_list = []
                             for value in frame[key]:
-                                str_value_list.append(str(json.loads(json.dumps(value))))
+                                str_value_list.append(value if isinstance(value, str) else json.dumps(value))
                             typed_dict[key] = str_value_list
                     # else it is a 'normal' str
                     else:
