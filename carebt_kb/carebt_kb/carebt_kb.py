@@ -167,8 +167,12 @@ class KbServer(Node):
     ## CRUD query callback
 
     def __crud_query_callback(self, request: KbQuery.Request, response: KbQuery.Response):
-        self.get_logger().info(
-            f'Incoming request: {request.operation}, filter: {request.filter}, data: {request.data}')
+        if request.operation == 'READ':
+            self.get_logger().debug(
+                f'Incoming request: {request.operation}, filter: {request.filter}')
+        else:
+            self.get_logger().info(
+                f'Incoming request: {request.operation}, filter: {request.filter}')
 
         # create
         if(request.operation.upper() == 'CREATE'):

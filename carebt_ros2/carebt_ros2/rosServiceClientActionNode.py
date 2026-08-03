@@ -67,7 +67,7 @@ class RosServiceClientActionNode(ActionNode):
             self._response = client.call(self._request)
             self.set_status(NodeStatus.SUCCESS)
             self.get_logger().info(
-                f'service call successful, response: {self._response}')
+                f'service call successful')
         else:
             self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
