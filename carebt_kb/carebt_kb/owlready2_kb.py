@@ -24,6 +24,10 @@ class OwlReady2Kb():
 
     OWL_KEYWORDS = ['iri', 'is_a', 'name', 'namespace', 'storid']
 
+    @property
+    def lock(self) -> threading.RLock:
+        return self.__lock
+
     def __init__(self, filename: str, sync_to_file: bool = False):
         self.__lock = threading.RLock()
         self.__filename = filename
