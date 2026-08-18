@@ -52,11 +52,10 @@ class RosServiceClientActionNode(ActionNode):
         self.__bt_runner = bt_runner
 
     def on_init(self) -> None:
-        self.get_logger().info('{} - call service {} with {} - {}'
+        self.get_logger().info('{} - call service {} with {}'
                                .format(self.__class__.__name__,
                                        self._service,
-                                       self._type,
-                                       self._request))
+                                       self._type))
         self.set_status(NodeStatus.SUSPENDED)
         Thread(target=self.__worker, daemon=True).start()
 
