@@ -7,6 +7,7 @@ careBT-ROS2 - ROS2 binding for careBT
 
    introduction
    packages
+   execution_trace
 
 .. toctree::
    :maxdepth: 2

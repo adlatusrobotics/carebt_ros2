@@ -1,0 +1,24 @@
+uint8 SESSION_STARTED=0
+uint8 SESSION_ENDED=1
+uint8 CHILD_DECLARED=2
+uint8 CHILD_REMOVED=3
+uint8 INSTANCE_ATTACHED=4
+uint8 INSTANCE_DELETED=5
+uint8 STATUS_CHANGED=6
+uint8 CONTINGENCY_CHANGED=7
+uint8 CONTINGENCY_HANDLED=8
+uint8 PARAMETER_CHANGED=9
+uint8 EVENTS_DROPPED=10
+
+builtin_interfaces/Time stamp
+string session_id
+uint64 sequence
+uint8 event_type
+uint64 call_id
+uint64 instance_id
+uint64 parent_call_id
+uint8 previous_status
+uint8 current_status
+string contingency_message
+string contingency_handler
+carebt_msgs/ExecutionTraceParameter[] parameters

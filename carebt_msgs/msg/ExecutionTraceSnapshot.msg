@@ -1,0 +1,8 @@
+builtin_interfaces/Time stamp
+string session_id
+uint64 last_sequence
+bool session_active
+string carebt_version
+string compatibility_error
+uint64 dropped_event_count
+carebt_msgs/ExecutionTraceNode[] nodes
