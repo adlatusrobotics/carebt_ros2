@@ -146,10 +146,11 @@ class TraceSnapshot:
 class ExecutionTraceConfig:
     """Bounds and publication settings for execution tracing."""
 
-    history_depth: int = 5000
+    history_depth: int = 10
     max_value_bytes: int = 1024
     max_collection_items: int = 50
     max_depth: int = 4
+    event_publish_period_ms: int = 100
     snapshot_period_ms: int = 250
     redacted_name_patterns: tuple[str, ...] = (
         'password',
@@ -313,6 +314,7 @@ class ExecutionTraceRecorder:
                         parent_call_id=trace_node.parent_call_id,
                         current_status=trace_node.status,
                         contingency_message=trace_node.contingency_message,
+                        parameters=tuple(trace_node.parameters.values()),
                     )
             self._emit(TraceEventType.SESSION_ENDED)
             self._session_active = False
@@ -456,6 +458,7 @@ class ExecutionTraceRecorder:
                     parent_call_id=trace_node.parent_call_id,
                     current_status=trace_node.status,
                     contingency_message=trace_node.contingency_message,
+                    parameters=tuple(trace_node.parameters.values()),
                 )
 
     def capture_parameters(self, child_context: Any, direction: int) -> None:
@@ -476,25 +479,19 @@ class ExecutionTraceRecorder:
                 names = child._internal_get_out_params()
                 bindings = trace_node.output_bindings
 
-            changed = []
+            parameter_changed = False
             for index, declared_name in enumerate(names):
                 name = declared_name.lstrip('?')
                 binding = bindings[index] if index < len(bindings) else ''
                 value = getattr(child, declared_name.replace('?', '_', 1), None)
                 parameter = self._serializer.serialize(name, direction, binding, value)
                 key = f'{direction}:{name}'
-                if trace_node.parameters.get(key) != parameter:
-                    trace_node.parameters[key] = parameter
-                    changed.append(parameter)
-            if changed:
-                self._emit(
-                    TraceEventType.PARAMETER_CHANGED,
-                    call_id=call_id,
-                    instance_id=instance_id,
-                    parent_call_id=trace_node.parent_call_id,
-                    current_status=trace_node.status,
-                    parameters=tuple(changed),
-                )
+                previous = trace_node.parameters.get(key)
+                trace_node.parameters[key] = parameter
+                if previous != parameter:
+                    parameter_changed = True
+            if parameter_changed:
+                self._dirty = True
 
     def note_error(self, message: str) -> None:
         """Retain the first instrumentation error without raising it."""
@@ -503,12 +500,14 @@ class ExecutionTraceRecorder:
                 self._compatibility_error = message
                 self._dirty = True
 
-    def drain_events(self) -> tuple[TraceEvent, ...]:
-        """Return queued events and a drop marker, then empty the handoff queue."""
+    def drain_events(self, maximum: Optional[int] = None) -> tuple[TraceEvent, ...]:
+        """Return up to maximum queued events and a drop marker when space permits."""
         with self._lock:
-            events = list(self._publish_queue)
-            self._publish_queue.clear()
-            if self._unreported_drop_count:
+            count = len(self._publish_queue) if maximum is None else min(
+                maximum, len(self._publish_queue))
+            events = [self._publish_queue.popleft() for _ in range(count)]
+            marker_fits = maximum is None or len(events) < maximum
+            if not self._publish_queue and self._unreported_drop_count and marker_fits:
                 dropped = self._unreported_drop_count
                 self._unreported_drop_count = 0
                 marker = self._new_event(
@@ -519,8 +518,8 @@ class ExecutionTraceRecorder:
                 events.append(marker)
             return tuple(events)
 
-    def snapshot(self) -> TraceSnapshot:
-        """Return a coherent copy of current and bounded removed node state."""
+    def snapshot(self, include_completed: bool = True) -> TraceSnapshot:
+        """Return current state, optionally including completed and removed nodes."""
         with self._lock:
             return TraceSnapshot(
                 stamp_ns=self._now_ns(),
@@ -530,7 +529,11 @@ class ExecutionTraceRecorder:
                 carebt_version=self._carebt_version,
                 compatibility_error=self._compatibility_error,
                 dropped_event_count=self._dropped_event_count,
-                nodes=tuple(deepcopy(list(self._nodes.values()))),
+                nodes=tuple(deepcopy([
+                    node for node in self._nodes.values()
+                    if include_completed or node.lifecycle not in (
+                        TraceLifecycle.COMPLETED, TraceLifecycle.REMOVED)
+                ])),
             )
 
     def take_dirty(self) -> bool:
@@ -940,17 +943,22 @@ class CarebtExecutionTraceHooks:
 class ExecutionTracePublisher:
     """Publish recorder events and snapshots without blocking CareBT hooks."""
 
+    _MAXIMUM_EVENTS_PER_BATCH = 100
+
     def __init__(self, ros_node: Any, runner: Any, config: ExecutionTraceConfig):
         from carebt_msgs.msg import ExecutionTraceEvent
+        from carebt_msgs.msg import ExecutionTraceEventBatch
         from carebt_msgs.msg import ExecutionTraceNode
         from carebt_msgs.msg import ExecutionTraceParameter
         from carebt_msgs.msg import ExecutionTraceSnapshot
+        from carebt_msgs.srv import GetExecutionTrace
         from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile
         from rclpy.qos import ReliabilityPolicy
 
         self._ros_node = ros_node
         self._runner = runner
         self._event_type = ExecutionTraceEvent
+        self._event_batch_type = ExecutionTraceEventBatch
         self._node_type = ExecutionTraceNode
         self._parameter_type = ExecutionTraceParameter
         self._snapshot_type = ExecutionTraceSnapshot
@@ -958,9 +966,9 @@ class ExecutionTracePublisher:
 
         event_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
-            depth=config.history_depth,
-            reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
         )
         snapshot_qos = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -969,11 +977,18 @@ class ExecutionTracePublisher:
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
         self._event_publisher = ros_node.create_publisher(
-            ExecutionTraceEvent, '/carebt/execution_trace/events', event_qos)
+            ExecutionTraceEventBatch, '/carebt/execution_trace/events', event_qos)
         self._snapshot_publisher = ros_node.create_publisher(
             ExecutionTraceSnapshot, '/carebt/execution_trace/snapshot', snapshot_qos)
-        self._timer = ros_node.create_timer(
-            max(1, config.snapshot_period_ms) / 1000.0, self._publish_pending)
+        self._full_tree_service = ros_node.create_service(
+            GetExecutionTrace,
+            '/carebt/execution_trace/get_full_tree',
+            self._get_full_tree,
+        )
+        self._event_timer = ros_node.create_timer(
+            max(1, config.event_publish_period_ms) / 1000.0, self._publish_events)
+        self._snapshot_timer = ros_node.create_timer(
+            max(1, config.snapshot_period_ms) / 1000.0, self._publish_snapshot)
 
         compatibility_error = CarebtExecutionTraceHooks.install()
         if compatibility_error:
@@ -997,20 +1012,34 @@ class ExecutionTracePublisher:
         """Finish and publish the current trace session."""
         if self.compatible:
             self.recorder.end_session()
-        self._publish_pending(force_snapshot=True)
+        self._publish_events()
+        self._publish_snapshot(force=True)
 
     def destroy(self) -> None:
         """Release runner registration and ROS entities."""
         CarebtExecutionTraceHooks.unregister(self._runner)
-        self._ros_node.destroy_timer(self._timer)
+        self._ros_node.destroy_timer(self._event_timer)
+        self._ros_node.destroy_timer(self._snapshot_timer)
         self._ros_node.destroy_publisher(self._event_publisher)
         self._ros_node.destroy_publisher(self._snapshot_publisher)
+        self._ros_node.destroy_service(self._full_tree_service)
 
-    def _publish_pending(self, force_snapshot: bool = False) -> None:
-        for event in self.recorder.drain_events():
-            self._event_publisher.publish(self._event_message(event))
-        if force_snapshot or self.recorder.take_dirty():
-            self._snapshot_publisher.publish(self._snapshot_message(self.recorder.snapshot()))
+    def _publish_events(self) -> None:
+        events = self.recorder.drain_events(self._MAXIMUM_EVENTS_PER_BATCH)
+        if events:
+            message = self._event_batch_type()
+            message.events = [self._event_message(event) for event in events]
+            self._event_publisher.publish(message)
+
+    def _publish_snapshot(self, force: bool = False) -> None:
+        if force or self.recorder.take_dirty():
+            snapshot = self.recorder.snapshot(include_completed=False)
+            self._snapshot_publisher.publish(self._snapshot_message(snapshot))
+
+    def _get_full_tree(self, request: Any, response: Any) -> Any:
+        del request
+        response.snapshot = self._snapshot_message(self.recorder.snapshot())
+        return response
 
     def _parameter_message(self, parameter: TraceParameter) -> Any:
         message = self._parameter_type()

@@ -12,9 +12,11 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ExecutionTraceEvent.msg"
+  "msg/ExecutionTraceEventBatch.msg"
   "msg/ExecutionTraceNode.msg"
   "msg/ExecutionTraceParameter.msg"
   "msg/ExecutionTraceSnapshot.msg"
+  "srv/GetExecutionTrace.srv"
   "srv/KbQuery.srv"
   "action/KbEvalState.action"
   DEPENDENCIES builtin_interfaces

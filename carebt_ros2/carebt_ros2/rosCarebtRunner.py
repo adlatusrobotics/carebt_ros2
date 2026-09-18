@@ -62,6 +62,7 @@ class RosCarebtRunner(Node):
         self.declare_parameter('execution_trace.max_value_bytes', 1024)
         self.declare_parameter('execution_trace.max_collection_items', 50)
         self.declare_parameter('execution_trace.max_depth', 4)
+        self.declare_parameter('execution_trace.event_publish_period_ms', 100)
         self.declare_parameter('execution_trace.snapshot_period_ms', 250)
         self.declare_parameter(
             'execution_trace.redacted_name_patterns',
@@ -83,6 +84,8 @@ class RosCarebtRunner(Node):
                 max_collection_items=(
                     self.get_parameter('execution_trace.max_collection_items').value),
                 max_depth=self.get_parameter('execution_trace.max_depth').value,
+                event_publish_period_ms=(
+                    self.get_parameter('execution_trace.event_publish_period_ms').value),
                 snapshot_period_ms=(
                     self.get_parameter('execution_trace.snapshot_period_ms').value),
                 redacted_name_patterns=tuple(

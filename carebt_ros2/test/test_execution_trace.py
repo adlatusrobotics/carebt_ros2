@@ -86,6 +86,7 @@ def test_records_topology_lifecycle_and_declared_parameters():
         '_RootNode', 'ParameterSequence', 'AddOne']
     assert [node.parent_call_id for node in snapshot.nodes] == [0, 1, 2]
     assert all(node.lifecycle == TraceLifecycle.COMPLETED for node in snapshot.nodes)
+    assert recorder.snapshot(include_completed=False).nodes == ()
 
     parameters = [
         parameter
@@ -103,6 +104,14 @@ def test_records_topology_lifecycle_and_declared_parameters():
         and parameter.binding == 'result'
         and parameter.value == '3'
         for parameter in parameters
+    )
+    add_one_call_id = snapshot.nodes[-1].call_id
+    assert any(
+        event.event_type == TraceEventType.INSTANCE_DELETED
+        and event.call_id == add_one_call_id
+        and any(parameter.name == 'result' and parameter.value == '3'
+                for parameter in event.parameters)
+        for event in recorder.events()
     )
 
 
@@ -133,6 +142,38 @@ def test_dynamic_removal_preserves_removed_call_slot():
         and event.call_id == removed.call_id
         for event in recorder.events()
     )
+    assert removed.call_id not in {
+        node.call_id for node in recorder.snapshot(include_completed=False).nodes
+    }
+
+
+def test_parameter_values_update_snapshots_without_change_events():
+    """Parameter values dirty snapshots without producing high-rate events."""
+    runner = BehaviorTreeRunner()
+    recorder = ExecutionTraceRecorder()
+    recorder.start_session()
+    child = AddOne(runner)
+    recorder.instance_created(child)
+    call_id = recorder._instance_ids[child][0]
+    context = type('Context', (), {'instance': child})()
+    child._value = 2
+
+    recorder.capture_parameters(context, 0)
+    event_count = len(recorder.events())
+    assert recorder.take_dirty()
+    recorder._nodes[call_id].input_bindings = ('other_binding',)
+    recorder.capture_parameters(context, 0)
+
+    assert len(recorder.events()) == event_count
+    assert recorder.snapshot().nodes[-1].parameters['0:value'].binding == 'other_binding'
+    assert recorder.take_dirty()
+    assert not recorder.take_dirty()
+
+    child._value = 3
+    recorder.capture_parameters(context, 0)
+    assert len(recorder.events()) == event_count
+    assert recorder.take_dirty()
+    assert recorder.snapshot().nodes[-1].parameters['0:value'].value == '3'
 
 
 def test_serializer_redacts_nested_secrets_and_truncates_values():
@@ -168,6 +209,21 @@ def test_event_handoff_is_bounded_and_reports_drops():
     assert len(events) == 3
     assert events[-1].event_type == TraceEventType.EVENTS_DROPPED
     assert recorder.snapshot().dropped_event_count > 0
+
+
+def test_event_handoff_can_be_drained_in_bounded_batches():
+    """A bounded drain retains excess events for the next publisher tick."""
+    recorder = ExecutionTraceRecorder(ExecutionTraceConfig(history_depth=10))
+    recorder.start_session()
+    for _ in range(4):
+        recorder._emit(TraceEventType.SESSION_ENDED)
+
+    first = recorder.drain_events(3)
+    second = recorder.drain_events(3)
+
+    assert len(first) == 3
+    assert len(second) == 2
+    assert [event.sequence for event in first + second] == [1, 2, 3, 4, 5]
 
 
 def test_hooks_route_two_runners_to_independent_sessions():

@@ -50,6 +50,10 @@ Parameters
      - int
      - 4
      - Maximum recursive serialization depth.
+   * - ``execution_trace.event_publish_period_ms``
+     - int
+     - 100
+     - Event batch publication period. Each batch contains at most 100 events.
    * - ``execution_trace.snapshot_period_ms``
      - int
      - 250
@@ -63,15 +67,29 @@ ROS interface
 -------------
 
 ``/carebt/execution_trace/events``
-  Ordered ``carebt_msgs/msg/ExecutionTraceEvent`` deltas. The sequence number,
-  rather than the timestamp, defines event order.
+  ``carebt_msgs/msg/ExecutionTraceEventBatch`` messages containing up to 100
+  ordered event deltas. The sequence number, rather than the timestamp, defines
+  event order. Parameter changes are not emitted as individual events; live
+  values are delivered in periodic snapshots and final values are attached to
+  instance-deleted events.
 
 ``/carebt/execution_trace/snapshot``
   The latest ``carebt_msgs/msg/ExecutionTraceSnapshot``. It allows late-joining
-  tools to reconstruct the current tree and recover from an event gap.
+  tools to reconstruct the current tree and recover from an event gap. Periodic
+  snapshots omit nodes with the ``COMPLETED`` and ``REMOVED`` lifecycles to
+  keep message size proportional to the active tree. The RViz panel treats each
+  periodic snapshot as authoritative for the active tree; event continuity is
+  not required to maintain its current structure.
 
-Both topics use reliable, transient-local QoS. Event history is bounded by
-``execution_trace.history_depth``; the snapshot topic retains one sample.
+``/carebt/execution_trace/get_full_tree``
+  A ``carebt_msgs/srv/GetExecutionTrace`` service returning active and completed
+  nodes together with bounded removed-node history. The RViz panel requests it
+  only when the user enables ``Show history``.
+
+Event batches use best-effort, volatile QoS with a depth of 10 to avoid
+retransmission and late-join backlog. Snapshots use reliable, transient-local
+QoS and retain one sample. The recorder handoff and removed-node history are
+bounded by ``execution_trace.history_depth``.
 
 Only parameters declared through the CareBT input/output syntax are recorded.
 Values are converted to bounded JSON. ROS messages are converted through
@@ -83,9 +101,9 @@ RViz panel
 
 Add ``adl_rviz_plugins/CarebtExecutionTracePanel`` in RViz. The panel provides:
 
-* the pending and current call tree with lifecycle and CareBT status;
-* an optional removed-node history;
-* the latest declared input and output values for the selected node; and
+* the pending and current call tree with node-kind icons, lifecycle, and status;
+* optional completed and removed-node history loaded on demand;
+* the node kind and latest declared input and output values for the selected node; and
 * a bounded, filterable event table.
 
 The pause control stops local rendering only. It does not pause CareBT or ROS
