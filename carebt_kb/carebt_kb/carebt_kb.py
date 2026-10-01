@@ -23,7 +23,7 @@ from carebt_kb.plugin_base import import_class
 
 from rclpy.action import ActionServer, CancelResponse
 from rclpy.node import Node
-from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.action.server import ServerGoalHandle
 
@@ -86,12 +86,13 @@ class KbServer(Node):
             plugin_class = import_class(plugin_type)
             self.__plugins.append(plugin_class(self, plugin))
 
-        self.__eval_timer = self.create_timer(
-            60.0, self.__evaluate_pending_goals,
-            callback_group=ReentrantCallbackGroup())
+        # exclusive group ensures a single evaluator; repeated triggers coalesce
+        self.__eval_trigger = self.create_guard_condition(
+            self.__evaluate_pending_goals,
+            callback_group=MutuallyExclusiveCallbackGroup())
 
     def __kb_updated(self):
-        self.__eval_timer.reset()
+        self.__eval_trigger.trigger()
         for plugin in self.__plugins:
             plugin.on_update_callback()
 
@@ -103,7 +104,7 @@ class KbServer(Node):
         goal_handle.executing()
         with self.__pending_lock:
             self.__pending_goals.append(goal_handle)
-        self.__eval_timer.reset()
+        self.__eval_trigger.trigger()
 
     def __evaluate_pending_goals(self):
         with self.__pending_lock:
@@ -161,7 +162,7 @@ class KbServer(Node):
 
     def __wait_eval_state_cancel_callback(self, goal_handle):
         self.get_logger().info(f'cancel_callback -- Received cancel request: {goal_handle}')
-        self.__eval_timer.reset()
+        self.__eval_trigger.trigger()
         return CancelResponse.ACCEPT
 
     ## CRUD query callback
