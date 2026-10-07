@@ -19,6 +19,7 @@ from uuid import uuid4
 
 from rclpy.action import ActionClient
 from rclpy.action.client import NumberOfEntities
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.client import Client
 from rclpy.node import Node
 from rclpy.publisher import Publisher
@@ -187,6 +188,7 @@ class RosClientManager:
                     topic_name,
                     lambda msg, k=key: self._dispatch(k, msg),
                     qos,
+                    callback_group=MutuallyExclusiveCallbackGroup(),
                 )
                 fanout = _TopicFanOut(sub)
                 self._subscriptions[key] = fanout
