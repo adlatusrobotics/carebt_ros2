@@ -113,8 +113,8 @@ class WaitForLocalizationTF(ActionNode):
 
     def on_timeout(self) -> None:
         self.__thread_running = False
-        self.set_status(NodeStatus.FAILURE)
         self.set_contingency_message('NOT_LOCALIZED')
+        self.set_status(NodeStatus.FAILURE)
 
     #def __del__(self) -> None:
     #    self.__initialpose_pub.destroy()
@@ -160,8 +160,8 @@ class GetCurrentPose(ActionNode):
 
     def on_timeout(self) -> None:
         self.__thread_running = False
-        self.set_status(NodeStatus.FAILURE)
         self.set_contingency_message('CURRENT_POSE_NOT_AVAILABLE')
+        self.set_status(NodeStatus.FAILURE)
 
 ########################################################################
 

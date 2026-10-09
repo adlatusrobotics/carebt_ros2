@@ -130,7 +130,9 @@ class RosClientManager:
         with self._lock:
             client = self._action_clients.get(key)
             if client is None:
-                client = _SafeActionClient(self._node, action_type, action_name)
+                client = _SafeActionClient(
+                    self._node, action_type, action_name,
+                    callback_group=MutuallyExclusiveCallbackGroup())
                 self._action_clients[key] = client
             else:
                 self._node.get_logger().debug(f"client already exists: {key}")
@@ -146,7 +148,9 @@ class RosClientManager:
         with self._lock:
             client = self._service_clients.get(key)
             if client is None:
-                client = self._node.create_client(srv_type, service_name)
+                client = self._node.create_client(
+                    srv_type, service_name,
+                    callback_group=MutuallyExclusiveCallbackGroup())
                 self._service_clients[key] = client
             else:
                 self._node.get_logger().debug(f"client already exists: {key}")

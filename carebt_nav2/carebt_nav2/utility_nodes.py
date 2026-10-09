@@ -49,8 +49,8 @@ class NoopAction(ActionNode):
         self._contingency_message = ""
 
     def on_init(self) -> None:
-        self.set_status(self._status)
         self.set_contingency_message(self._contingency_message)
+        self.set_status(self._status)
 
 ########################################################################
 
@@ -165,12 +165,14 @@ class LifecycleClient(ActionNode):
             req.transition.id = self._id
             res: ChangeState.Response = self.__change_state_client.call(req)
             if not res.success:
-                self.set_status(NodeStatus.FAILURE)
                 self.set_contingency_message('CHANGE_STATE_FAILED')
+                self.set_status(NodeStatus.FAILURE)
+                return
         else:
             self.get_logger().warn('service not available')
-            self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+            self.set_status(NodeStatus.FAILURE)
+            return
 
         while True:
             if(not self.__thread_running):
@@ -185,8 +187,8 @@ class LifecycleClient(ActionNode):
 
     def on_timeout(self) -> None:
         self.__thread_running = False
-        self.set_status(NodeStatus.FAILURE)
         self.set_contingency_message('TIMEOUT')
+        self.set_status(NodeStatus.FAILURE)
 
     def __del__(self) -> None:
         self.__change_state_client.destroy()
@@ -236,11 +238,11 @@ class SetParameterClient(ActionNode):
             if resp.results[0].successful:
                 self.set_status(NodeStatus.SUCCESS)
             else:
-                self.set_status(NodeStatus.FAILURE)
                 self.set_contingency_message('PARAM_NOT_SET')
+                self.set_status(NodeStatus.FAILURE)
         else:
-            self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+            self.set_status(NodeStatus.FAILURE)
 
 ########################################################################
 
@@ -286,11 +288,11 @@ class SetParameterListClient(ActionNode):
             if all(resp.results[i].successful for i in range(len(resp.results))):
                 self.set_status(NodeStatus.SUCCESS)
             else:
-                self.set_status(NodeStatus.FAILURE)
                 self.set_contingency_message('PARAM_NOT_SET')
+                self.set_status(NodeStatus.FAILURE)
         else:
-            self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+            self.set_status(NodeStatus.FAILURE)
 
 
 class GetParameterClient(ActionNode):
@@ -325,17 +327,17 @@ class GetParameterClient(ActionNode):
             req.names = [self._param_name]
             resp = self.__client.call(req)
             if len(resp.values) > 0:
-                self.set_status(NodeStatus.SUCCESS)
                 self._param_value = parameter_value_to_python(resp.values[0])
+                self.set_status(NodeStatus.SUCCESS)
                 self.get_logger().info('{} - {} got param {} with value {}'
                                        .format(self.__class__.__name__,
                                                self._node,
                                                self._param_name,
                                                self._param_value))
             else:
-                self.set_status(NodeStatus.FAILURE)
                 self.set_contingency_message('PARAM_NOT_FOUND')
+                self.set_status(NodeStatus.FAILURE)
         else:
-            self.set_status(NodeStatus.FAILURE)
             self.set_contingency_message('SERVICE_NOT_AVAILABLE')
+            self.set_status(NodeStatus.FAILURE)
 
